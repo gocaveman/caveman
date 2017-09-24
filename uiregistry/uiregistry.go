@@ -1,13 +1,13 @@
 package uiregistry
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"sync"
 
-	"github.com/blang/semver"
 	"github.com/spf13/afero"
 )
 
@@ -17,50 +17,140 @@ var ErrNotFound = errors.New("not found")
 // here in their init() function.
 var Global = NewUIRegistry()
 
+func ParseName(s string) (typ, name string, err error) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("expected exactly two colon separated parts but instead found %d part(s)", len(parts))
+	}
+	return parts[0], parts[1], nil
+}
+
 // NewUIRegistry makes a new empty initialized UIRegistry.
 func NewUIRegistry() *UIRegistry {
 	return &UIRegistry{
-		typeNameMap: make(map[string]map[string]EntryPtrList),
-		fileNameMap: make(map[string]*Entry),
+		reg: make(map[string]*entry),
 	}
 }
 
 // UIRegistry is a registry of JS and CSS libraries; the global instance of which is called Global in this package.
 type UIRegistry struct {
-	typeNameMap map[string]map[string]EntryPtrList
-	fileNameMap map[string]*Entry
-	rwmu        sync.RWMutex
+	rwmu sync.RWMutex
+
+	reg map[string]*entry
 }
 
-// RegReader describes a registry which is capable of resolving requests for libraries.
+func (r *UIRegistry) MustRegister(name string, deps []string, ds DataSource) {
+	err := r.Register(name, deps, ds)
+	if err != nil {
+		panic(err)
+	}
+}
+func (r *UIRegistry) Register(name string, deps []string, ds DataSource) error {
+	r.rwmu.Lock()
+	defer r.rwmu.Unlock()
+
+	_, _, err := ParseName(name)
+	if err != nil {
+		return err
+	}
+
+	r.reg[name] = &entry{
+		DataSource: ds,
+		Deps:       deps,
+	}
+
+	return nil
+}
+
+// Lookup takes a single name and returns the corresponding DataSource.
+func (r *UIRegistry) Lookup(name string) (DataSource, error) {
+
+	r.rwmu.RLock()
+	defer r.rwmu.RUnlock()
+
+	if ret, ok := r.reg[name]; ok {
+		return ret.DataSource, nil
+	}
+
+	return nil, ErrNotFound
+}
+
+// ResolveDeps takes one or more names and returns a list of the libraries that need to be
+// included in order to resolve all dependencies, in the correct sequence.
+func (r *UIRegistry) ResolveDeps(names ...string) ([]string, error) {
+
+	r.rwmu.RLock()
+	defer r.rwmu.RUnlock()
+
+	var out []string
+
+	// go through each requested library
+	for _, name := range names {
+
+		entry, ok := r.reg[name]
+		if !ok {
+			return nil, fmt.Errorf("unable to find registry entry for %q", name)
+		}
+
+		// for each dependency add it before this entry, unless it's already there
+		for _, dep := range entry.Deps {
+			if !stringSliceContains(out, dep) {
+				out = append(out, dep)
+			}
+		}
+
+		// add this entry
+		out = append(out, name)
+
+	}
+
+	// if after including dependencies the list was changed, recurse and resolve dependencies again
+	if !isSameStrings(out, names) {
+		return r.ResolveDeps(out...)
+	}
+
+	// dependencies didn't change the list, we're done
+	return out, nil
+
+}
+
+// Resolver describes a registry which is capable of resolving requests for libraries.
 // Components which need to resolve libraries but not register them (i.e. stuff dealing
 // with js and css files during the render path) should use this interface as the
 // appropriate abstraction.
-type RegReader interface {
-	Resolve(typ string, spec string) (Entry, error)
-	ResolveFile(fileName string) (Entry, error)
-	ResolveAll(typ string, specs []string) ([]Entry, error)
+type Resolver interface {
+	Lookup(name string) (DataSource, error)
+	ResolveDeps(name ...string) ([]string, error)
 }
 
 // Entry describes a specific version of a library, it's dependencies and provides a way to get it's raw data (DataSource)
-type Entry struct {
-	Type     string   // type of file, e.g. "js", "css" (also potentially "map")
-	Name     string   // name of package, e.g. "jquery"
-	Version  string   // semver format, e.g. "1.2.3"
-	FileName string   // name of file for use in URLs, e.g. "jquery-1.2.3.js"
-	Deps     []string // dependencies in Spec format
-	// FIXME: what about adding some sort of "priority" value here so you can specify overrides and say "yes I really want to override this version of 'jquery'" or whatever
-	DataSource DataSource // source of file data
+type entry struct {
+	DataSource DataSource
+	Deps       []string
 }
 
-type EntryPtrList []*Entry
+func isSameStrings(s1 []string, s2 []string) bool {
 
-func (p EntryPtrList) Len() int      { return len(p) }
-func (p EntryPtrList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func (p EntryPtrList) Less(i, j int) bool {
-	vi, _ := semver.Parse(p[i].Version)
-	vj, _ := semver.Parse(p[j].Version)
-	return vi.Compare(vj) < 0
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	for i := 0; i < len(s1); i++ {
+		if s1[i] != s2[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stringSliceContains(haystack []string, needle string) bool {
+	for _, e := range haystack {
+		if e == needle {
+			return true
+		}
+	}
+	return false
 }
 
 type DataSource interface {
@@ -74,109 +164,47 @@ type ReadSeekCloser interface {
 	io.Seeker
 }
 
-func NewFileDataSource(fs afero.Fs, path string) (DataSource, error) {
-	// fs.Open(name)
+type FileDataSource struct {
+	fs afero.Fs
+	p  string
+}
+
+func (fds *FileDataSource) OpenData() (ReadSeekCloser, error) {
+	f, err := fds.fs.Open(fds.p)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func NewFileDataSource(fs afero.Fs, path string) DataSource {
+	return &FileDataSource{fs: fs, p: path}
+}
+
+type BytesDataSource struct {
+	b []byte
+}
+
+func (bds *BytesDataSource) String() string {
+	var s string
+	if len(bds.b) > 64 {
+		s = string(bds.b[:64]) + "..."
+	} else {
+		s = string(bds.b)
+	}
+	return fmt.Sprintf("&BytesDataSource{%q}", s)
+}
+
+type byteData struct {
+	*bytes.Reader
+}
+
+func (d *byteData) Close() error { return nil }
+
+func (fds *BytesDataSource) OpenData() (ReadSeekCloser, error) {
+	return &byteData{Reader: bytes.NewReader(fds.b)}, nil
 }
 
 func NewBytesDataSource(b []byte) DataSource {
-
-}
-
-// Register is called to add an entry to the registry (a specific single version of a library)
-func (r *UIRegistry) Register(entry Entry) error {
-
-	// make sure version looks valid
-	_, err := semver.Parse(entry.Version)
-	if err != nil {
-		return err
-	}
-
-	// write lock
-	r.rwmu.Lock()
-	defer r.rwmu.Unlock()
-
-	nMap := r.typeNameMap[entry.Type]
-	if nMap == nil {
-		nMap = make(map[string]EntryPtrList)
-	}
-
-	entries := nMap[entry.Name]
-
-	// FIXME: what about duplicates???
-	entries = append(entries, &entry)
-
-	sort.Sort(entries)
-
-	nMap[entry.Name] = entries
-
-	r.typeNameMap[entry.Type] = nMap
-
-	// FIXME: check for duplicate here
-	r.fileNameMap[entry.FileName] = &entry
-
-	return nil
-}
-
-func (r *UIRegistry) Resolve(typ string, spec string) (ret Entry, retErr error) {
-	r.rwmu.RLock()
-	defer r.rwmu.RUnlock()
-
-	nMap := r.typeNameMap[typ]
-	if nMap == nil {
-		return ret, ErrNotFound
-	}
-
-	sSpec := Spec(spec)
-	name := sSpec.Name()
-	sRange, err := sSpec.Range()
-	if err != nil {
-		return ret, err
-	}
-
-	entries := nMap[name]
-	for _, entry := range entries {
-		ver, _ := semver.Parse(entry.Version)
-		if sRange(ver) {
-			return *entry, nil
-		}
-	}
-
-	return ret, nil
-}
-
-func (r *UIRegistry) ResolveFile(fileName string) (ret Entry, retErr error) {
-	r.rwmu.RLock()
-	defer r.rwmu.RUnlock()
-
-	entry := r.fileNameMap[fileName]
-	if entry != nil {
-		return *entry, nil
-	}
-
-	return ret, ErrNotFound
-}
-
-func (r *UIRegistry) ResolveAll(typ string, specs []string) ([]Entry, error) {
-	r.rwmu.RLock()
-	defer r.rwmu.RUnlock()
-
-	panic("TO BE IMPLEMENTED")
-
-	return nil, nil
-}
-
-// Spec format "package@semverrange"
-type Spec string
-
-func (s Spec) Name() string {
-	return strings.Split(string(s), "@")[0]
-}
-
-func (s Spec) Range() (semver.Range, error) {
-	parts := strings.Split(string(s), "@")
-	if len(parts) < 2 {
-		return semver.ParseRange("*")
-	}
-
-	return semver.ParseRange(parts[1])
+	return &BytesDataSource{b: b}
 }
