@@ -12,8 +12,6 @@ import (
 	"strings"
 	"text/template/parse"
 
-	"github.com/russross/blackfriday"
-
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -298,7 +296,9 @@ func (t *MarkdownBodyTemplater) BodyTemplate(r io.Reader) (*PageMeta, string, er
 	text, err := ParseMetaAndText(b, meta)
 
 	// process text md->html
-	output := blackfriday.MarkdownCommon([]byte(text))
+	// output := blackfriday.MarkdownCommon([]byte(text))
+	panic("FIXME: some strange version issue with blackfriday, commenting this out until we get it sorted")
+	output := []byte(text)
 
 	return meta, t.TemplatePrefix + string(output) + t.TemplateSuffix, err
 
