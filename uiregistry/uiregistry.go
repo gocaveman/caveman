@@ -1,14 +1,10 @@
 package uiregistry
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
-
-	"github.com/spf13/afero"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -119,13 +115,13 @@ func (r *UIRegistry) ResolveDeps(names ...string) ([]string, error) {
 // with js and css files during the render path) should use this interface as the
 // appropriate abstraction.
 type Resolver interface {
-	Lookup(name string) (DataSource, error)
+	Lookup(name string) (webutil.DataSource, error)
 	ResolveDeps(name ...string) ([]string, error)
 }
 
 // Entry describes a specific version of a library, it's dependencies and provides a way to get it's raw data (DataSource)
 type entry struct {
-	DataSource DataSource
+	DataSource webutil.DataSource
 	Deps       []string
 }
 
@@ -151,60 +147,4 @@ func stringSliceContains(haystack []string, needle string) bool {
 		}
 	}
 	return false
-}
-
-type DataSource interface {
-	// OpenData opens a readable stream of data for the file.
-	OpenData() (ReadSeekCloser, error)
-}
-
-type ReadSeekCloser interface {
-	io.Closer
-	io.Reader
-	io.Seeker
-}
-
-type FileDataSource struct {
-	fs afero.Fs
-	p  string
-}
-
-func (fds *FileDataSource) OpenData() (ReadSeekCloser, error) {
-	f, err := fds.fs.Open(fds.p)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
-func NewFileDataSource(fs afero.Fs, path string) DataSource {
-	return &FileDataSource{fs: fs, p: path}
-}
-
-type BytesDataSource struct {
-	b []byte
-}
-
-func (bds *BytesDataSource) String() string {
-	var s string
-	if len(bds.b) > 64 {
-		s = string(bds.b[:64]) + "..."
-	} else {
-		s = string(bds.b)
-	}
-	return fmt.Sprintf("&BytesDataSource{%q}", s)
-}
-
-type byteData struct {
-	*bytes.Reader
-}
-
-func (d *byteData) Close() error { return nil }
-
-func (fds *BytesDataSource) OpenData() (ReadSeekCloser, error) {
-	return &byteData{Reader: bytes.NewReader(fds.b)}, nil
-}
-
-func NewBytesDataSource(b []byte) DataSource {
-	return &BytesDataSource{b: b}
 }

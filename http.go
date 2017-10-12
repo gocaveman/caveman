@@ -63,9 +63,12 @@ func (h *DefaultCacheHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Re
 // 	SetNextHandler(http.Handler) ChainedHandler
 // }
 
+// FIXME: this whole thing should be replaced with webutil.ChainHandler
 type ChainedHandler interface {
 	http.Handler
+	// FIXME: return value should be removed, just cleaner
 	SetNextHandler(next http.Handler) (self ChainedHandler)
+	// TODO: ChainedHandlerBase - embed this and get chained for free
 }
 
 // BuildHandlerChain takes a HandlerList (slice of http.Handler instances) and finds any that implement ChainedHandler

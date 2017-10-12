@@ -1,0 +1,5 @@
+package renderer
+
+func New() /* ... */ {
+
+}
