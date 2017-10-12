@@ -3,7 +3,6 @@ package uifiles
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gocaveman/caveman/filesystem/aferofs"
 	"github.com/gocaveman/caveman/webutil"
 	"github.com/spf13/afero"
 )
@@ -84,10 +84,9 @@ func TestFileMangler(t *testing.T) {
 	defer os.RemoveAll(localFSDir)
 	defer os.RemoveAll(cacheDir)
 
-	outputStore := NewRWFSOutputStore(afero.NewBasePathFs(afero.NewOsFs(), cacheDir))
-	log.Printf("outputStore: %#v", outputStore)
+	outputStore := NewFileSystemOutputStore(aferofs.New(afero.NewBasePathFs(afero.NewOsFs(), cacheDir)), 0)
 
-	fm := NewFileMangler(uiResolver, http.Dir(localFSDir), cacheDir)
+	fm := NewFileMangler(uiResolver, http.Dir(localFSDir), outputStore)
 	fm.TokenKey = []byte("test")
 
 	wrec := httptest.NewRecorder()
@@ -129,7 +128,7 @@ func TestFileMangler(t *testing.T) {
 	}
 
 	// remake the FileMangler (as if server bounced)
-	fm = NewFileMangler(uiResolver, http.Dir(localFSDir), cacheDir)
+	fm = NewFileMangler(uiResolver, http.Dir(localFSDir), outputStore)
 	fm.TokenKey = []byte("test")
 
 	// request combined file again
@@ -143,5 +142,27 @@ func TestFileMangler(t *testing.T) {
 	if (!bytes.Contains(b, []byte(`test1`))) || (!bytes.Contains(b, []byte(`testA`))) {
 		t.Fatalf("response did not contain expected strings, instead got: %s", b)
 	}
+
+	// recreate FileMangler, delete the disk file and request again (should regenerate from token)
+	fm = NewFileMangler(uiResolver, http.Dir(localFSDir), outputStore)
+	fm.TokenKey = []byte("test")
+	os.RemoveAll(cacheDir)
+	os.Mkdir(cacheDir, 0755)
+
+	// request combined file again
+	wrec = httptest.NewRecorder()
+	w = wrec
+	r = httptest.NewRequest("GET", setp, nil)
+	fm.ServeHTTPChain(w, r)
+
+	// check again to make sure it looks right
+	b, _ = httputil.DumpResponse(wrec.Result(), true)
+	if (!bytes.Contains(b, []byte(`test1`))) || (!bytes.Contains(b, []byte(`testA`))) {
+		t.Fatalf("response did not contain expected strings, instead got: %s", b)
+	}
+
+	// touch one of the disk files (should break the prehash and regenerate but otherwise work correctly)
+
+	// build the set, delete the disk file, change one of the contents of the files and request the URL - should invoke WrongContentHandler
 
 }

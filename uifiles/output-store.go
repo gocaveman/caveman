@@ -3,7 +3,9 @@ package uifiles
 import (
 	"io/ioutil"
 	"os"
+	"time"
 
+	"github.com/gocaveman/caveman/filesystem"
 	"github.com/gocaveman/caveman/webutil"
 )
 
@@ -25,17 +27,21 @@ type OutputStore interface {
 	GCFiles() error
 }
 
-// RWFSOutputStore implements OutputStore on top of a webutil.RWFS
-type RWFSOutputStore struct {
-	RWFS webutil.RWFS
+// FileSystemOutputStore implements OutputStore on top of a filesystem.FileSystem
+type FileSystemOutputStore struct {
+	FileSystem       filesystem.FileSystem
+	GCFilesOlderThan time.Duration
 }
 
-func NewRWFSOutputStore(rwfs webutil.RWFS) *RWFSOutputStore {
-	return &RWFSOutputStore{RWFS: rwfs}
+func NewFileSystemOutputStore(fs filesystem.FileSystem, gcFilesOlderThan time.Duration) *FileSystemOutputStore {
+	if gcFilesOlderThan <= 0 {
+		gcFilesOlderThan = time.Hour * 24
+	}
+	return &FileSystemOutputStore{FileSystem: fs, GCFilesOlderThan: gcFilesOlderThan}
 }
 
-func (s *RWFSOutputStore) WriteFile(fname string, content []byte) error {
-	f, err := s.RWFS.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+func (s *FileSystemOutputStore) WriteFile(fname string, content []byte) error {
+	f, err := s.FileSystem.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -44,16 +50,48 @@ func (s *RWFSOutputStore) WriteFile(fname string, content []byte) error {
 	return err
 }
 
-func (s *RWFSOutputStore) ReadFile(fname string) ([]byte, error) {
-	f, err := s.RWFS.Open(fname)
+func (s *FileSystemOutputStore) ReadFile(fname string) ([]byte, error) {
+	f, err := s.FileSystem.Open(fname)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, webutil.ErrNotFound
+		}
 		return nil, err
 	}
 	defer f.Close()
-	return ioutil.ReadAll(f)
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	// update timestamp, to ensure GC doesn't eat it
+	err = s.FileSystem.Chtimes(fname, time.Now(), time.Now())
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
-func (s *RWFSOutputStore) GCFiles() error {
-	panic("not implemented yet")
+func (s *FileSystemOutputStore) GCFiles() error {
+
+	rootF, err := s.FileSystem.Open("/")
+	if err != nil {
+		return err
+	}
+	defer rootF.Close()
+
+	fis, err := rootF.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, fi := range fis {
+		if fi.ModTime().Add(s.GCFilesOlderThan).Before(time.Now()) {
+			err = s.FileSystem.Remove(fi.Name())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

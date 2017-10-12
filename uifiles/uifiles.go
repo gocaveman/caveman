@@ -106,6 +106,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"path"
@@ -126,13 +127,13 @@ type UIResolver interface {
 // 	UIRequire(name string) error
 // }
 
-func NewFileMangler(uiResolver UIResolver, localFs http.FileSystem, cacheDir string) *FileMangler {
+func NewFileMangler(uiResolver UIResolver, localFs http.FileSystem, outputStore OutputStore) *FileMangler {
 
 	ret := &FileMangler{
 		URLPrefix:      "/fm-assets",
 		UIResolver:     uiResolver,
 		LocalFilesFs:   localFs,
-		CacheDir:       cacheDir,
+		OutputStore:    outputStore,
 		Minifier:       NewDefaultMinifier(),
 		hashContentMap: make(map[string][]byte),
 		prehashHashMap: make(map[string]string),
@@ -146,9 +147,10 @@ func NewFileMangler(uiResolver UIResolver, localFs http.FileSystem, cacheDir str
 type FileMangler struct {
 	URLPrefix string // URL prefix to use, default from NewFileMangler is "/fm-assets"
 
-	CacheDir string // directory to cache combined files in, if empty then disk cache is disabled
+	// CacheDir string // directory to cache combined files in, if empty then disk cache is disabled
 	// FIXME: we might also need a mechanism that is able to push this stuff out to a CDN - so maybe it's
 	// not a matter of a CacheDir but of making something simple but pluggable here.
+	OutputStore OutputStore
 
 	UIResolver   UIResolver      // for resolving libraries (usually from registry)
 	LocalFilesFs http.FileSystem // for resolving local files not via registry
@@ -232,8 +234,24 @@ func (fm *FileMangler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		content, ok := fm.hashContentMap[hashString]
 		fm.mu.RUnlock()
 
+		fname := hashString + "." + typeName
+
+		// not in memory, let's try OutputStore
+		if !ok {
+			if fm.OutputStore != nil {
+				b, err := fm.OutputStore.ReadFile(fname)
+				if err != nil {
+					if err != webutil.ErrNotFound {
+						log.Printf("FileMangler: Error reading from OutputStore(fname=%q): %v", fname, err)
+					}
+				} else {
+					content = b
+				}
+			}
+		}
+
 		// we have it in memory cache, so just serve it
-		if ok {
+		if content != nil {
 			header := w.Header()
 			// if no cache-control set, our behavior is to tell the browser to cache for a long time
 			if header.Get("cache-control") == "" {
@@ -402,6 +420,11 @@ func (fs *FileSet) resolveDeps() (resolveFiles FileEntryList, localFiles FileEnt
 
 }
 
+func (fs *FileSet) FilePaths(filterType string) ([]string, error) {
+	panic("not implemented")
+	return nil, nil
+}
+
 // BuildFilePaths is the unminified and uncombined set of files, but in the correct sequence and ready to be output.
 // It's intended for debugging JS and/or CSS.
 // TODO: we really should track back to the configuration how this
@@ -409,17 +432,22 @@ func (fs *FileSet) resolveDeps() (resolveFiles FileEntryList, localFiles FileEnt
 // in config you can (and it can be overridden based on deployment context)
 // set a flag which the template would pick up to use this call instead of
 // BuildSetPath.  But BuildSetPath would be the default if unspecified.
-func (fs *FileSet) FilePaths(filterType string) ([]string, error) {
+func (fs *FileSet) FilePathsNoPrefix(filterType string) ([]string, error) {
 
 	panic("not implemented")
 	return nil, nil
+}
+
+func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
+	ret, err := fs.BuildSetPathNoPrefix(filterType)
+	return fs.fileMangler.URLPrefix + "/" + ret, err
 }
 
 // BuildSetPath performs file combination and whatever else to build the specified set and returns the path name (intended for output in the HTML page).
 // You can call BuildSetPath as many times as you want for a given set but once it is called you must not call UIRequire() again for this FileSet (for this HTTP request).
 // If everything is cached, this operation could return very quickly.
 // The setName is usually either "js" or "css".
-func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
+func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 
 	// use uiResolver to add depedencies and sort and to separate into resolveFiles and localFiles
 	resolveFiles, localFiles, err := fs.resolveDeps()
@@ -461,7 +489,7 @@ func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
 	prehash := NewHash()
 	prehash.FileEntryList(resolveFiles)
 	prehash.FileEntryList(localFiles)
-	// FIXME: we could/should add an option to skip this step - this would mean that
+	// TODO: we could/should add an option to skip this step - this would mean that
 	// in production you can avoid hitting the disk to check the timestamps every time a request is made
 	// (although the rest of the code path needs to be checked to ensure we're not incidentally hitting
 	// it somewhere else - but still should be doable in theory)
@@ -474,7 +502,7 @@ func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
 	hashString := fs.fileMangler.prehashHashMap[prehashString]
 	fs.fileMangler.mu.RUnlock()
 	if hashString != "" {
-		return fs.fileMangler.URLPrefix + "/" + hashString + "." + filterType + tokenSuffix, nil
+		return hashString + "." + filterType + tokenSuffix, nil
 	}
 
 	// no prehash entry found, we need to regenerate everything
@@ -516,13 +544,19 @@ func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
 	// - store content keyed by hash
 	fs.fileMangler.hashContentMap[hashString] = wb
 
-	// TODO: write to disk cache file if enabled
+	// write to output store file if enabled
+	if fs.fileMangler.OutputStore != nil {
+		err := fs.fileMangler.OutputStore.WriteFile(hashString+"."+filterType, wb)
+		if err != nil {
+			return "", err
+		}
+	}
 
 	// - store prehash->hash
 	fs.fileMangler.prehashHashMap[prehashString] = hashString
 
 	// we're good now
-	return fs.fileMangler.URLPrefix + "/" + hashString + "." + filterType + tokenSuffix, nil
+	return hashString + "." + filterType + tokenSuffix, nil
 
 	// return fs.fileMangler.URLPrefix + "/" + hashString + "." + filterType + "?t=" // be sure to add token
 
