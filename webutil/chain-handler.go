@@ -69,6 +69,26 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 	return w, r
 }
 
+// ServeHTTPChain checks h to see if it implements ChainHandler and calls ServeHTTPChain if so.  Otherwise it falls
+// back to http.Handler and ServeHTTP.  The returned w and r will be as returned by ServeHTTPChain or if
+// falling back to ServeHTTP same as input.  Will panic if h does not implement either interface.
+func ServeHTTPChain(h interface{}, w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request) {
+
+	h1, ok := h.(ChainHandler)
+	if ok {
+		return h1.ServeHTTPChain(w, r)
+	}
+
+	h2, ok := h.(http.Handler)
+	if ok {
+		h2.ServeHTTP(w, r)
+		return w, r
+	}
+
+	panic(fmt.Errorf("ServeHTTPChain: %#v is not a valid ChainHandler or http.Handler", h))
+
+}
+
 // NewCtxSetHandler is a helper that returns a ChainHandler which assigns a static value to the request context each time
 // it is called.  (NOTE: If you want a dynamic value just implement ChainHandler yourself.  The point of this function
 // is to make static values assignable as one-liners in your configuration code, e.g. making configuration values
@@ -79,5 +99,10 @@ func NewCtxSetHandler(key string, value interface{}) ChainHandler {
 	})
 }
 
+// TODO: implement this one:
+// func NewCtxMapHandler(ctxMap map[string]interface{}) *CtxMapHandler {
+
 // TODO: what about PriorityHandlerList, which is a slice of PriorityHandler structs which have a priority float 0-100
 // and gets sorted before use (maybe it gets sorted each time something is added?)
+// Also think about having a Name field or similar and the ability to find or remove based on names.  It might
+// be very useful to find the default provider for something by its name and make some changes to it or remove it.

@@ -5,12 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/gocaveman/caveman/filesystem"
 	"github.com/spf13/afero"
 )
 
 // New returns a new instance adapted from afero.Fs.
-func New(fs afero.Fs) filesystem.FileSystem {
+func New(fs afero.Fs) *AferoFs {
 	return &AferoFs{Fs: fs}
 }
 

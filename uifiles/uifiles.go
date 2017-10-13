@@ -106,12 +106,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gocaveman/caveman/webutil"
 )
@@ -147,11 +150,6 @@ func NewFileMangler(uiResolver UIResolver, localFs http.FileSystem, outputStore 
 type FileMangler struct {
 	URLPrefix string // URL prefix to use, default from NewFileMangler is "/fm-assets"
 
-	// CacheDir string // directory to cache combined files in, if empty then disk cache is disabled
-	// FIXME: we might also need a mechanism that is able to push this stuff out to a CDN - so maybe it's
-	// not a matter of a CacheDir but of making something simple but pluggable here.
-	OutputStore OutputStore
-
 	UIResolver   UIResolver      // for resolving libraries (usually from registry)
 	LocalFilesFs http.FileSystem // for resolving local files not via registry
 	// LocalFilesHandler http.Handler    // TODO: later, local files can also be obtained by internal request (need to decide what has higher priority); but some things to resolve like how to tell if a file is changed without doing a full request (HEAD?)
@@ -166,17 +164,25 @@ type FileMangler struct {
 	// sessions or other sensitive uses, generate something separate for this.
 	TokenKey []byte
 
+	// Gets called in situations where the wrong version of a file would be returned.
+	// If the handler writes a response (implies cancelling the request context), then the wrong content will not
+	// be returned.  Otherwise if no action is taken by this handler the wrong content will be returned.
 	WrongContentHandler http.Handler
-
-	// If true this causes situations where the wrong version of a file would be returned to 500 error instead of
-	// returning whatever version we have with cache headers telling the browser to not cache.
-	// ErrorOnWrongVersion bool
 
 	hashContentMap map[string][]byte // cache of hash -> content
 	prehashHashMap map[string]string // cache of prehash -> hash
 	mu             sync.RWMutex      // lock for maps
 
-	// nextHandler http.Handler
+	// storage for output files, usually local directory impl with FileSystemOutputStore but could also
+	// be backed with remote storage (CDN for example)
+	OutputStore OutputStore
+
+	OutputStoreGCDelay time.Duration // how long do we way between calls to OutputStore GC, default if 0 is 10 min
+
+	outputStoreGCInProgress bool         // are we doing OutputStore GC
+	outputStoreGCLastTime   time.Time    // when did we last OutputStore GC
+	outputStoreGCmu         sync.RWMutex // lock specifically for OutputStore garbage collection
+
 }
 
 func (fm *FileMangler) resolveFileDataSources(files FileEntryList) ([]webutil.DataSource, error) {
@@ -187,6 +193,10 @@ func (fm *FileMangler) resolveFileDataSources(files FileEntryList) ([]webutil.Da
 		}
 		ds, err := fm.UIResolver.Lookup(f)
 		if err != nil {
+			// Note that resolveFileDataSources should never be called on a resource that doesn't exist,
+			// since the definition of a "resolve file" vs a "local file" is if the resolved knows about
+			// it (i.e. we got a valid Lookup() on it before) - see FileSet.resolveDeps;
+			// Thus we don't need to check for the "not found" condition here and do something special with it
 			return nil, err
 		}
 		ret = append(ret, ds)
@@ -195,19 +205,78 @@ func (fm *FileMangler) resolveFileDataSources(files FileEntryList) ([]webutil.Da
 }
 
 func (fm *FileMangler) localFileDataSources(files FileEntryList) ([]webutil.DataSource, error) {
+
+	var missing []string
+
 	var ret []webutil.DataSource
 	for _, f := range files {
+
 		fparts := strings.SplitN(f, ":", 2)
 		fname := fparts[len(fparts)-1]
-		ret = append(ret, webutil.NewHTTPFSDataSource(fm.LocalFilesFs, fname))
+
+		ffile, err := fm.LocalFilesFs.Open(fname)
+		if os.IsNotExist(err) || err == webutil.ErrNotFound {
+			missing = append(missing, fname)
+		} else {
+			ffile.Close()
+
+			ret = append(ret, webutil.NewHTTPFSDataSource(fm.LocalFilesFs, fname))
+		}
+
 	}
-	return ret, nil
+
+	// if any missing files we still return our result but with an error that indicates the condition
+	var reterr error
+	if len(missing) > 0 {
+		reterr = NewMissingRequirementsError(missing)
+	}
+
+	return ret, reterr
 }
 
-// // SetNextHandler implements ChainedHandler
-// func (fm *FileMangler) SetNextHandler(next http.Handler) {
-// 	fm.nextHandler = next
-// }
+func (fm *FileMangler) runGCIfNeeded() {
+
+	// figure out the delay
+	delay := fm.OutputStoreGCDelay
+	if delay <= 0 {
+		delay = time.Minute * 10
+	}
+
+	// see if time exceeded and we're not already running
+	needsGC := false
+	fm.outputStoreGCmu.RLock()
+	if (!fm.outputStoreGCInProgress) && time.Now().After(fm.outputStoreGCLastTime.Add(delay)) {
+		needsGC = true
+	}
+	fm.outputStoreGCmu.RUnlock()
+
+	// log.Printf("needsGC=%v fm.outputStoreGCLastTime=%v", needsGC, fm.outputStoreGCLastTime)
+
+	// if GC needed acquire write lock for that and proceed
+	if needsGC {
+		// log.Printf("needsGC")
+		fm.outputStoreGCmu.Lock()
+		// double check to make sure it's still needed
+		if (!fm.outputStoreGCInProgress) && time.Now().After(fm.outputStoreGCLastTime.Add(delay)) {
+			// update timestamp and kick it off in a separate goroutine
+			fm.outputStoreGCLastTime = time.Now()
+			fm.outputStoreGCInProgress = true
+			go func() {
+				// log.Printf("performing GCFiles")
+				err := fm.OutputStore.GCFiles()
+				if err != nil {
+					// nothing much we can do except log it
+					log.Printf("Error during FileMangler.OutputStore.GCFiles: %v", err)
+				}
+				fm.outputStoreGCmu.Lock()
+				defer fm.outputStoreGCmu.Unlock()
+				fm.outputStoreGCInProgress = false
+			}()
+		}
+		fm.outputStoreGCmu.Unlock()
+	}
+
+}
 
 func (fm *FileMangler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
@@ -217,9 +286,14 @@ func (fm *FileMangler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// run GC if it's time
+	fm.runGCIfNeeded()
+
 	lp := strings.TrimPrefix(p, fm.URLPrefix+"/")
 
 	// serve combined file
+	// note probably an exact regexp match on name (exact hash length, single dot, then file ext) would work well here,
+	// although I don't see a reason this logic wouldn't work either...
 	if !strings.Contains(lp, "/") {
 
 		lpparts := strings.Split(lp, ".")
@@ -250,6 +324,70 @@ func (fm *FileMangler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// if we didn't get it by now, let's try recreating it from the token
+		token := r.URL.Query().Get("t")
+		if content == nil && len(fm.TokenKey) > 0 && token != "" {
+
+			var fileEntryList FileEntryList
+			err := DecodeToken(&fileEntryList, fm.TokenKey, token)
+			if err != nil {
+				log.Printf("Error decoding token (%q): %v", token, err)
+			} else {
+
+				fileSet := &FileSet{fileMangler: fm, files: fileEntryList}
+
+				setp, err := fileSet.BuildSetPathNoPrefix(typeName)
+				if err != nil {
+					// specifically check for IsMissingResourceError and use that to trigger the WrongContentHandler
+					if IsMissingRequirementsError(err) {
+						if fm.WrongContentHandler != nil {
+							w, r = webutil.ServeHTTPChain(fm.WrongContentHandler, w, r)
+							if r.Context().Err() != nil { // is request handled
+								return
+							}
+						}
+						// if WrongContentHandler didn't exist or didn't handle above, fall through
+					} else {
+						// any other error we bail on
+						webutil.HTTPError(w, r, err, "internal error", 500)
+						return
+					}
+				}
+
+				// see if what was generated has the same hash, if not then something changed since the URL we're
+				// serving was generated
+				if !strings.HasPrefix(setp, hashString) {
+
+					if fm.WrongContentHandler != nil {
+						w, r = webutil.ServeHTTPChain(fm.WrongContentHandler, w, r)
+						if r.Context().Err() != nil { // is request handled
+							return
+						}
+					}
+
+					// not handled, in this case we just proceed to serve what was just created
+					// and log a warning
+					newHashString := strings.SplitN(setp, ".", 2)[0]
+					abbrevToken := token
+					if len(abbrevToken) > 40 {
+						abbrevToken = abbrevToken[:40] + "..."
+					}
+					log.Printf("Warning - FileMangler: expected hash %q but after generating from token %q got %q; falling through to serve what we have", hashString, abbrevToken, newHashString)
+					hashString = newHashString
+					// disable cache in this case - we don't want browsers hanging onto the wrong stuff
+					w.Header().Set("cache-control", "no-store")
+
+				}
+
+				// at this point, whatever happend above should have given us a hashString which is the content to serve
+				fm.mu.RLock()
+				content, _ = fm.hashContentMap[hashString]
+				fm.mu.RUnlock()
+
+			}
+
+		}
+
 		// we have it in memory cache, so just serve it
 		if content != nil {
 			header := w.Header()
@@ -263,33 +401,112 @@ func (fm *FileMangler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("content-type", ct)
 				}
 			}
+
+			// TODO: if we can determine an appropriate date, we may be better off using
+			// http.ServeContent here, in order to avoid sending back the guts of the file
+			// if not needed (i.e. the case of if-not-modifed header and 304 response)
 			w.Write(content)
+
+			// kick off a touch in the background (trying to keep in-memory cache hits as fast as possible)
+			if fm.OutputStore != nil {
+				go func() {
+					fname := hashString + "." + typeName
+					err := fm.OutputStore.TouchFile(fname)
+					if err != nil {
+						log.Printf("OutputStore.TouchFile(%q) error: %v", fname, err)
+					}
+				}()
+			}
+
 			return
 		}
-
-		// TODO: handle cases where it's not in cache (disk cache, generate from token)
 
 		return
 
 	}
 
-	// TODO: serve individual assets, needs to work with FilePaths
+	// now check for individual file
+
 	// Make this super obvious and direct, no translation at all:
 	// js:github.com/gocaveman-libs/jquery -> /fm-assets/js:github.com/gocaveman-libs/jquery
 	// js:/path/to/local.js -> /fm-assets/js:/path/to/local.js
 
-	// Hm - okay so what about cache breaking - maybe /fm-assets/js:/path/to/local.js?ver=[hash]
-	// and then the error handling logic (WrongContentHandler) could also apply!?
+	resourceName := lp
+	ver := r.URL.Query().Get("ver")
 
-	http.NotFound(w, r)
+	ds, err := fm.UIResolver.Lookup(resourceName)
+	if err == webutil.ErrNotFound {
+		resourceNameParts := strings.SplitN(resourceName, ":", 2)
+		if len(resourceNameParts) > 1 {
+			fname := resourceNameParts[1]
+			localF, err := fm.LocalFilesFs.Open(fname)
+			if err == nil {
+				localF.Close()
+				// FIXME: this is kinda messy - we open the file twice, should be a good way to
+				// detect if file doesn't exist but not have to reopen it - maybe there's a variation
+				// on NewHTTPFSDataSource that can accept an open file - maybe it's an "open once data source"
+				ds = webutil.NewHTTPFSDataSource(fm.LocalFilesFs, fname)
+			}
+		}
+	}
+
+	if err == webutil.ErrNotFound || os.IsNotExist(err) {
+		http.NotFound(w, r)
+		return
+	} else if err != nil {
+		webutil.HTTPError(w, r, err, "internal error finding file", 500)
+		return
+	}
+
+	rsc, err := ds.OpenData()
+	if err != nil {
+		webutil.HTTPError(w, r, err, "internal error opening data source", 500)
+		return
+	}
+	defer rsc.Close()
+
+	// read the data in
+	b, err := ioutil.ReadAll(rsc)
+	if err != nil {
+		webutil.HTTPError(w, r, err, "internal error reading data source", 500)
+		return
+	}
+
+	// hash it
+	hash := NewHash()
+	hash.Write(b)
+	hashString := hash.ResultString()
+
+	// compare hash and use it to set header
+	if hashString == ver {
+		// keep it for a week
+		w.Header().Set("cache-control", "max-age=604800")
+	} else {
+		// don't store it at all - it's the wrong version
+		w.Header().Set("cache-control", "no-store")
+	}
+
+	if w.Header().Get("content-type") == "" {
+		ct := mime.TypeByExtension("." + strings.SplitN(resourceName, ".", 2)[0])
+		if ct != "" {
+			w.Header().Set("content-type", ct)
+		}
+	}
+
+	// try to get a valid mod time so we can do http.ServeContent
+	var modTime time.Time
+	st, _ := ds.Stat()
+	if st != nil {
+		modTime = st.ModTime()
+	}
+
+	if !modTime.IsZero() {
+		http.ServeContent(w, r, resourceName, modTime, bytes.NewReader(b))
+	} else {
+		w.Write(b)
+	}
+
 	return
-
-	// check for content in memory map of hash->content
-	// check for disk file in CacheDir named with hash
-
-	// FIXME: what about the background thing that cleans up the cacheDir...
-	// maybe we just kick that off every minute (if it's not already still running!)
-	// from ServeHTTP - might be easier than a continuous goroutine
 
 }
 
@@ -306,7 +523,6 @@ func (fm *FileMangler) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (w
 
 	return w, r.WithContext(ctx)
 
-	// fm.nextHandler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func CtxFileSet(ctx context.Context) *FileSet {
@@ -332,8 +548,8 @@ func Require(r *http.Request, name string) error {
 func MustRequire(w http.ResponseWriter, r *http.Request, name string) {
 	err := Require(r, name)
 	if err != nil {
-		// FIXME: this should use webutil.HTTPError instead
-		panic(err)
+		webutil.HTTPError(w, r, err, fmt.Sprintf("MustRequire error for %q", name), 500)
+		return
 	}
 }
 
@@ -421,8 +637,20 @@ func (fs *FileSet) resolveDeps() (resolveFiles FileEntryList, localFiles FileEnt
 }
 
 func (fs *FileSet) FilePaths(filterType string) ([]string, error) {
-	panic("not implemented")
-	return nil, nil
+
+	files, err := fs.FilePathsNoPrefix(filterType)
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []string
+
+	for _, f := range files {
+		ret = append(ret, fs.fileMangler.URLPrefix+"/"+f)
+	}
+
+	return ret, nil
+
 }
 
 // BuildFilePaths is the unminified and uncombined set of files, but in the correct sequence and ready to be output.
@@ -434,8 +662,72 @@ func (fs *FileSet) FilePaths(filterType string) ([]string, error) {
 // BuildSetPath.  But BuildSetPath would be the default if unspecified.
 func (fs *FileSet) FilePathsNoPrefix(filterType string) ([]string, error) {
 
-	panic("not implemented")
-	return nil, nil
+	// use uiResolver to add depedencies and sort and to separate into resolveFiles and localFiles
+	resolveFiles, localFiles, err := fs.resolveDeps()
+	if err != nil {
+		return nil, err
+	}
+
+	// filter by type
+	resolveFiles = fileEntriesWithType(resolveFiles, filterType)
+	localFiles = fileEntriesWithType(localFiles, filterType)
+
+	var allDSs []webutil.DataSource
+	resolveDSs, err := fs.fileMangler.resolveFileDataSources(resolveFiles)
+	if err != nil {
+		return nil, err
+	}
+	allDSs = append(allDSs, resolveDSs...)
+	localDSs, err := fs.fileMangler.localFileDataSources(localFiles)
+	if err != nil {
+		return nil, err
+	}
+	allDSs = append(allDSs, localDSs...)
+
+	// this should be impossible but put in a check to ensure sanity
+	if len(allDSs) != len(resolveFiles)+len(localFiles) {
+		return nil, fmt.Errorf("unexpected state len(allDSs)[%d] != len(resolveFiles)[%d] + len(localFiles)[%d]", len(allDSs), len(resolveFiles), len(localFiles))
+	}
+
+	// for now, since this call is intended for development, we're going to rehash
+	// these files each time, ideally we would use a prehash to cache it
+	var ret []string
+
+	for i := 0; i < len(resolveDSs); i++ {
+		ds := resolveDSs[i]
+		name := resolveFiles[i]
+		rsc, err := resolveDSs[i].OpenData()
+		if err != nil {
+			return nil, fmt.Errorf("FilePathsNoPrefix error opening resolve file (ds=%+v): %v", ds, err)
+		}
+		defer rsc.Close()
+		hash := NewHash()
+		_, err = io.Copy(hash, rsc)
+		if err != nil {
+			return nil, fmt.Errorf("FilePathsNoPrefix error reading resolve file (ds=%+v): %v", ds, err)
+		}
+		hashString := hash.ResultString()
+		ret = append(ret, name+"?ver="+hashString)
+	}
+
+	for i := 0; i < len(localDSs); i++ {
+		ds := localDSs[i]
+		name := localFiles[i]
+		rsc, err := localDSs[i].OpenData()
+		if err != nil {
+			return nil, fmt.Errorf("FilePathsNoPrefix error opening local file (ds=%+v): %v", ds, err)
+		}
+		defer rsc.Close()
+		hash := NewHash()
+		_, err = io.Copy(hash, rsc)
+		if err != nil {
+			return nil, fmt.Errorf("FilePathsNoPrefix error reading local file (ds=%+v): %v", ds, err)
+		}
+		hashString := hash.ResultString()
+		ret = append(ret, name+"?ver="+hashString)
+	}
+
+	return ret, nil
 }
 
 func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
@@ -447,7 +739,7 @@ func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
 // You can call BuildSetPath as many times as you want for a given set but once it is called you must not call UIRequire() again for this FileSet (for this HTTP request).
 // If everything is cached, this operation could return very quickly.
 // The setName is usually either "js" or "css".
-func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
+func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (ret string, reterr error) {
 
 	// use uiResolver to add depedencies and sort and to separate into resolveFiles and localFiles
 	resolveFiles, localFiles, err := fs.resolveDeps()
@@ -473,6 +765,9 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 	}
 
 	// get all of the DataSources for resolveFiles and all of the http.Files for localFiles
+	// FIXME: from resolveFileDataSources and localFileDataSources we should detect the case
+	// of a missing file and build all the stuff we can and return the answer and that error,
+	// in ServeHTTP we need to detect that case, whereas in the template the error will show on the page (as it should)
 	var allDSs []webutil.DataSource
 	resolveDSs, err := fs.fileMangler.resolveFileDataSources(resolveFiles)
 	if err != nil {
@@ -481,7 +776,15 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 	allDSs = append(allDSs, resolveDSs...)
 	localDSs, err := fs.fileMangler.localFileDataSources(localFiles)
 	if err != nil {
-		return "", err
+
+		// missing requirements we continue on and pass the error back to the caller
+		if IsMissingRequirementsError(err) {
+			reterr = err
+		} else {
+			// anything else we bail
+			return "", err
+		}
+
 	}
 	allDSs = append(allDSs, localDSs...)
 
@@ -516,17 +819,18 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 		}
 		defer rsc.Close()
 
-		// TODO: minify
-
-		// if fs.fileMangler.Minifier != nil {
-		// 	fs.fileMangler.Minifier.Minify(contentType, w, r)
-		// } else {
-		// 	io.Copy(w, rsc)
-		// }
-		_, err = io.Copy(&w, rsc)
-		if err != nil {
-			return "", err
+		if fs.fileMangler.Minifier != nil {
+			err = fs.fileMangler.Minifier.Minify(filterType, &w, rsc)
+			if err != nil {
+				return "", fmt.Errorf("Error during minification (DataSource=%+v): %v", ds, err)
+			}
+		} else {
+			_, err = io.Copy(&w, rsc)
+			if err != nil {
+				return "", err
+			}
 		}
+
 		w.WriteByte('\n') // blank line between each file
 
 	}
@@ -541,7 +845,7 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 	fs.fileMangler.mu.Lock()
 	defer fs.fileMangler.mu.Unlock()
 
-	// - store content keyed by hash
+	// store content keyed by hash
 	fs.fileMangler.hashContentMap[hashString] = wb
 
 	// write to output store file if enabled
@@ -552,48 +856,46 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (string, error) {
 		}
 	}
 
-	// - store prehash->hash
+	// store prehash->hash
 	fs.fileMangler.prehashHashMap[prehashString] = hashString
 
 	// we're good now
-	return hashString + "." + filterType + tokenSuffix, nil
+	ret = hashString + "." + filterType + tokenSuffix
 
-	// return fs.fileMangler.URLPrefix + "/" + hashString + "." + filterType + "?t=" // be sure to add token
+	// return, including any reterr that may have been set above
+	return ret, reterr
 
-	// panic("not implemented")
-	// return "", nil
+}
 
-	// ----------------------
+// NewMissingRequirementsError does what you think it does.
+func NewMissingRequirementsError(what []string) error {
+	return MissingRequirementsError{Requirements: what}
+}
 
-	// FUCK, THIS IS WRONG
-	// var resolveFiles []string
-	// var localFiles []string
-	// for _, f := range fs.files {
-	// 	if !strings.HasPrefix(f, setName+":") {
-	// 		continue
-	// 	}
+// MissingRequirementsError is used to indicate that one or more requirements aren't there.
+// We need this separated out because it's an edge case that can happen during deployment
+// or with cached pages and we want predictable behavior.
+type MissingRequirementsError struct {
+	Requirements []string
+}
 
-	// 	if uiResolver != nil {
+func (e MissingRequirementsError) Error() string {
+	return fmt.Sprintf("Missing requirements: %+v", e.Requirements)
+}
 
-	// 		// see if the UIResolver knows about this file
-	// 		_, err := uiResolver.Lookup(f)
-	// 		if err == nil {
-	// 			resolveFiles = append(resolveFiles, f)
-	// 		} else if err != nil && err != webutil.ErrNotFound {
-	// 			return "", fmt.Errorf("error while resolving %q: %v", f, err)
-	// 		}
+func IsMissingRequirementsError(err error) bool {
+	_, ok := err.(MissingRequirementsError)
+	return ok
+}
 
-	// 	}
+type FileEntryList []string
 
-	// 	fname := strings.TrimPrefix(f, setName+"")
-
-	// 	fnameFile, err := fs.fileMangler.LocalFilesFs.Open(fname)
-	// 	if err != nil {
-	// 		return "", fmt.Errorf("error while trying to open local fs %q: %v", f, err)
-	// 	}
-	// 	fnameFile.Close()
-
-	// 	localFiles = append(localFiles, f)
-	// }
-
+func fileEntriesWithType(l FileEntryList, t string) FileEntryList {
+	ret := make(FileEntryList, 0, len(l))
+	for _, e := range l {
+		if strings.HasPrefix(e, t+":") {
+			ret = append(ret, e)
+		}
+	}
+	return ret
 }

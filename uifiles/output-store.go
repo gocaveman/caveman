@@ -22,6 +22,11 @@ type OutputStore interface {
 	// files may be written only once and read a great many times and this causing a GC could be bad.
 	ReadFile(fname string) ([]byte, error)
 
+	// TouchFile instructs the store to just update the timestamp.  This is called in cases where an in-memory
+	// cache-hit doesn't require reading from OutputStore but the timestamp should be updated to indicate that
+	// the file was just used.
+	TouchFile(fname string) error
+
 	// GCFiles is called periodically to tell the store to remove old unused files.
 	// The time required to call a file old enough to be removed is up to the implementation.
 	GCFiles() error
@@ -48,6 +53,10 @@ func (s *FileSystemOutputStore) WriteFile(fname string, content []byte) error {
 	defer f.Close()
 	_, err = f.Write(content)
 	return err
+}
+
+func (s *FileSystemOutputStore) TouchFile(fname string) error {
+	return s.FileSystem.Chtimes(fname, time.Now(), time.Now())
 }
 
 func (s *FileSystemOutputStore) ReadFile(fname string) ([]byte, error) {
@@ -86,6 +95,7 @@ func (s *FileSystemOutputStore) GCFiles() error {
 
 	for _, fi := range fis {
 		if fi.ModTime().Add(s.GCFilesOlderThan).Before(time.Now()) {
+			// log.Printf("GCFiles: about to remove %q (fi=%+v)", fi.Name(), fi)
 			err = s.FileSystem.Remove(fi.Name())
 			if err != nil {
 				return err
