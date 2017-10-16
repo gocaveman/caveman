@@ -46,7 +46,7 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 	for _, h := range hl {
 
 		if r.Context().Err() != nil {
-			return
+			return w, r
 		}
 
 		// try ChainHandler first
