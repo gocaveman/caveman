@@ -1,3 +1,4 @@
+// FIXME: does this belong as .../uifiles/uiregistry - to follow the same pattern
 package uiregistry
 
 import (
@@ -5,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/gocaveman/caveman/webutil"
 )
 
 var ErrNotFound = errors.New("not found")
