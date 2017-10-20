@@ -1,4 +1,4 @@
-// Translation tooling for internationalizes sites/pages/components.
+// Translation tooling for internationalized sites/pages/components.
 package i18n
 
 // flat file -> sqlite would be an excellent choice here (although it is actually simpler and
