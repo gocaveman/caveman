@@ -1,4 +1,4 @@
-// FIXME: does this belong as .../uifiles/uiregistry - to follow the same pattern
+// The uiregistry contains a registry of CSS, JS files and their dependency chain.
 package uiregistry
 
 import (
@@ -14,6 +14,9 @@ var ErrNotFound = errors.New("not found")
 
 // Global is the global registry instance, modules which provide libraries should register them
 // here in their init() function.
+// FIXME: Instead of a variable, I think we need two function calls - one to get something that implements
+// an interface for registering, and another that returns an interface that can read.  In the read call we
+// can verify it is called from main - webutil.MainOnly()
 var Global = NewUIRegistry()
 
 func ParseName(s string) (typ, name string, err error) {

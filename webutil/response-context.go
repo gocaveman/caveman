@@ -41,6 +41,9 @@ type ContextCancelResponseWriter struct {
 }
 
 func (w *ContextCancelResponseWriter) Write(p []byte) (int, error) {
+	// TODO: Either as an option here or in a separate handler,
+	// we should have something that can dump out the stack trace; as
+	// a debug tool so we can see what handler ended up writing.
 	w.cancelFunc()
 	return w.ResponseWriter.Write(p)
 }

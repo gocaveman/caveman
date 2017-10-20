@@ -88,6 +88,13 @@ func (w *HTMLMinResponseWriter) Write(p []byte) (int, error) {
 		// if text/html, create writer
 		if ct == "text/html" {
 			w.minw = w.m.Writer("text/html", w.ResponseWriter)
+
+			// Send an empty write through to the underlying writer - to be sure the context cancelation works.
+			// w.minw.Write() below is not guaranteed to reach the underlying response writer in this call.
+			w.ResponseWriter.Write(nil)
+
+		} else {
+			w.minw = &writeThrough{Writer: w.ResponseWriter}
 		}
 
 	} else {

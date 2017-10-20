@@ -14,8 +14,20 @@
 // </ul>
 package webutil
 
-import "errors"
+import (
+	"errors"
+)
 
 // ErrNotFound is a generic "not found" error.  Useful to communicate that generic concept
 // across packages without introducing dependencies.
 var ErrNotFound = errors.New("not found")
+
+// MainOnly checks the call stack to ensure that the caller is in the main package.
+// Used to defend against inexperienced developers trying to read from a registry anywhere
+// but in the main package.  The argument says how many
+func MainOnly(n int) {
+
+	// runtime.Stack(buf, all)
+	// TODO: implement, not sure if this is actually possible, but if it is... do it.
+
+}

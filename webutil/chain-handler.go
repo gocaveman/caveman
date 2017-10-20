@@ -3,6 +3,7 @@ package webutil
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -67,6 +68,15 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 	}
 
 	return w, r
+}
+
+// WithCloseHandler returns an http.Handler that calls ServeHTTPChain and then w.(io.Closer).Close().
+// You normally want to use this as your top-level Handler that is called from the HTTP server.
+func (hl HandlerList) WithCloseHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w, r = hl.ServeHTTPChain(w, r)
+		w.(io.Closer).Close()
+	})
 }
 
 // ServeHTTPChain checks h to see if it implements ChainHandler and calls ServeHTTPChain if so.  Otherwise it falls

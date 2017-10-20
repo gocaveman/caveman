@@ -45,6 +45,13 @@ type GzipResponseWriter struct {
 }
 
 func (w *GzipResponseWriter) Write(p []byte) (int, error) {
+
+	// TODO: Review if there are some common cases where we do not want to apply gzipping, e.g.
+	// - Binary content types possibly don't need it
+	// - See if it interferes at all with things like server-sent events
+	// - Also websockets, will things work correctly?
+	// The logic could be improved here to automatically disable in cases we can detect.
+
 	if !w.written {
 
 		// if no content type, we autodetect it here - because if we don't then the underlying default
@@ -55,7 +62,13 @@ func (w *GzipResponseWriter) Write(p []byte) (int, error) {
 		}
 
 		w.WriteHeader(http.StatusOK)
+
+		// Send an empty write through to the underlying writer - to be sure the context cancelation works.
+		// w.gzw.Write() below is not guaranteed to reach the underlying response writer in this call.
+		w.ResponseWriter.Write(nil)
+
 	}
+
 	return w.gzw.Write(p)
 }
 
