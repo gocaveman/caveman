@@ -1,3 +1,4 @@
+// Provides a minifier Handler for text/html output.
 package htmlmin
 
 import (
