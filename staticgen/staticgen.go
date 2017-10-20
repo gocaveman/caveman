@@ -1,3 +1,4 @@
+// Tools for generating a static website as a set of flat files intended for hosting on CDN or other non-dynamic hosting service.
 package staticgen
 
 // this should really be more of a toolbox than anything else - probably should use pages

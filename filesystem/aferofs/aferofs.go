@@ -1,4 +1,4 @@
-// Adapt Fs from github.com/spf13/afero to Filesystem
+// Adapt FS from github.com/spf13/afero to Filesystem
 package aferofs
 
 import (

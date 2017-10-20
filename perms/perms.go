@@ -1,3 +1,4 @@
+// Permissions and associated roles.
 package perms
 
 // figure out if structs or interfaces

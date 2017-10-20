@@ -1,3 +1,4 @@
+// Users and login functionality.
 package users
 
 // default user type - best if this type is not exported but that might be taking it too far

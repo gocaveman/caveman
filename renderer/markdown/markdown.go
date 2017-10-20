@@ -1,3 +1,4 @@
+// A renderer Loader that reads markdown.
 package markdown
 
 // TODO: use https://github.com/russross/blackfriday to render stuff, make sure we have well-defined behavior

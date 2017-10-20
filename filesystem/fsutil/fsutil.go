@@ -1,3 +1,4 @@
+// Utilties related to file systems.
 package fsutil
 
 import (

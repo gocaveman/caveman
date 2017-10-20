@@ -1,4 +1,4 @@
-// The uiregistry contains a registry of CSS, JS files and their dependency chain.
+// A registry of CSS, JS files and their dependency chain.
 package uiregistry
 
 import (

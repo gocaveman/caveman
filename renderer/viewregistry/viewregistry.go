@@ -1,3 +1,4 @@
+// Registry for views to automatically be made available on the site.
 package viewregistry
 
 import (

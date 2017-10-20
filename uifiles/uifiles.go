@@ -3,34 +3,44 @@
 // on a lightweight runtime solution that is easier to use, as automatic as possible while still being flexible,
 // and simple.
 //
-// <p>Key design points:
-// <ul>
-// <li>No build-time integration required, everything happens at runtime.
-// <li>During the request, anything can indicate that .. is required (by...)
-// <li>Requiring via a registry (as provided by the uiregistry package) is supported but not required for operation,
+// Key design points:
+//
+// No build-time integration required, everything happens at runtime.
+//
+// During the request, anything can indicate that .. is required (by...)
+//
+// Requiring via a registry (as provided by the uiregistry package) is supported but not required for operation,
 //     no direct dependency on it.
-// <li>The result is a single JS and a single CSS file which uniquely idenfies that set of files.  This can be disabled
+//
+// The result is a single JS and a single CSS file which uniquely idenfies that set of files.  This can be disabled
 //     but the idea is that you normally don't want to as this is a good way to do it - good browser performance and fully functional.
-// <li>The name (path) of that file should be deterministic - i.e. the same set of files should
+//
+// The name (path) of that file should be deterministic - i.e. the same set of files should
 //     always require in the same file name.  The name should also take into account the content of the
 //     files (in case any of the dependencies cahnges it results in a new file name); but should note take into
 //     account things which might be different across servers in a cluster, i.e. file timestamp.  The idea here is
 //     that you can run this on a cluster and get predictable results without the nodes of the cluster requiring communication
 //     or synchronization.  File timestamps can be used as a hint for cache invalidation but should have nothing to do with
 //     the actual output.
-// <li>It should be possible for file names from old processes to still be served after a restart even if those contents
+//
+// It should be possible for file names from old processes to still be served after a restart even if those contents
 //     cannot be reproduced.  The situation is that if files are cached either in the browser, or with a proxying CDN or
 //     anything else that might be in the request stream from client to server, you can end up with a situation where a deploy
 //     can cause old cached pages to request an old CSS or JS file which no longer exists, thus breaking that page.  This is
 //     should not be required for all deployments but it's vital we have an effective solution for this.
-// <li>Files should be minified to whatever extent is feasible.
-// <li>It must be fast, with appropriate caching wherever feasible.  The idea is you don't even notice it.
-// <li>While it's acknowledged that caching issues that apply to CSS and JS may also apply to other assets likes images,
+//
+// Files should be minified to whatever extent is feasible.
+//
+// It must be fast, with appropriate caching wherever feasible.  The idea is you don't even notice it.
+//
+// While it's acknowledged that caching issues that apply to CSS and JS may also apply to other assets likes images,
 //     it's much less of an issue we're going off the assumption that solutions related to other static files are more trouble
 //     than their worth.  CSS and JS files are the nightmare that we solve here.
-// <li>Even with all that, it's also darned simple to use.  Just as important as handling the various case above is that you
+//
+// Even with all that, it's also darned simple to use.  Just as important as handling the various case above is that you
 //     don't want to leap out the window when trying to use it.
-// <li>TODO: explain why we ended up adding a big long thing that can be decoded into the FileSet (because of the edge case of a cluster
+//
+// TODO: explain why we ended up adding a big long thing that can be decoded into the FileSet (because of the edge case of a cluster
 //     where node A generates the file but the request comes back to B due to round robin setup, B has no way to produce
 //     the file without this; another edge case is it does this and the underlying files have been updated, in which case
 //     we give the user of this lib the option to generate anyway or error; this looks to be the best possible thing that
@@ -38,7 +48,6 @@
 //     hash is best but can fail if the specific node in the cluster didn't see it first; and token which can fail if it's
 //     too long to fit in a valid URL (it may also not be desirable because of it's length and dev might turn it off
 //     due to that).
-// </ul>
 //
 // TODO: clean up the wording on the above after things work and we know what they are called - it's all theoretical
 // but later we can say "Use YXZ to do ABC" instead of "It should be possible to do ABC".

@@ -1,3 +1,4 @@
+// Registry for handlers to be automatically made available in the handler list.
 package handlerregistry
 
 import (

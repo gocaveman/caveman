@@ -1,3 +1,4 @@
+// Administrative control panel page and tools.
 package adminpages
 
 // need a way to register things - not sure if that's in here or a "adminregistry" subdir

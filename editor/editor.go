@@ -1,3 +1,4 @@
+// Visual editor for HTML and Go templates, utilizing Bootstrap.
 package editor
 
 // need something to provide a list of pages

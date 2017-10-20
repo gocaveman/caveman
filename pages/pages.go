@@ -1,3 +1,5 @@
+// Index and iteration for list of pages available on a site,
+// used by various other things that need to get a list of all available pages.
 package pages
 
 type Index interface {
