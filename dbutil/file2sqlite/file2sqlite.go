@@ -1,3 +1,5 @@
+// Toolings to take flat files and synchronize them with a sqlite database for easy access use of
+// large amounts of static data, generally versioned with the website project.
 package file2sqlite
 
 // developer provides a struct, can be unmarshaled from yaml or json or other

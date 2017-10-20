@@ -1,4 +1,4 @@
-// The uifiles package provides a runtime solution for CSS and JS file minication, combination and inclusion.
+// The uifiles package provides a runtime solution for CSS and JS file minification, combination and inclusion.
 // The intention is to obviate the need for tools like webpack which operate at build-time and instead focus
 // on a lightweight runtime solution that is easier to use, as automatic as possible while still being flexible,
 // and simple.
