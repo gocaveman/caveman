@@ -1,4 +1,4 @@
-package caveman
+package fsutil
 
 import (
 	"bytes"

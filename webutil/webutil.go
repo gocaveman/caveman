@@ -26,6 +26,7 @@ package webutil
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -56,7 +57,7 @@ func MainOnly(n int) {
 	// main.main()
 	// 	/Volumes/Files/git/caveman/src/github.com/gocaveman/quickstart-full/main.go:62 +0x61d
 
-	r := bufio.NewReader(stackbuf)
+	r := bufio.NewReader(bytes.NewReader(stackbuf))
 
 	r.ReadString('\n') // "goroutine N ..."
 

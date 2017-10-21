@@ -41,13 +41,13 @@ type UIRegistry struct {
 	reg map[string]*entry
 }
 
-func (r *UIRegistry) MustRegister(name string, deps []string, ds DataSource) {
+func (r *UIRegistry) MustRegister(name string, deps []string, ds webutil.DataSource) {
 	err := r.Register(name, deps, ds)
 	if err != nil {
 		panic(err)
 	}
 }
-func (r *UIRegistry) Register(name string, deps []string, ds DataSource) error {
+func (r *UIRegistry) Register(name string, deps []string, ds webutil.DataSource) error {
 	r.rwmu.Lock()
 	defer r.rwmu.Unlock()
 
@@ -65,7 +65,7 @@ func (r *UIRegistry) Register(name string, deps []string, ds DataSource) error {
 }
 
 // Lookup takes a single name and returns the corresponding DataSource.
-func (r *UIRegistry) Lookup(name string) (DataSource, error) {
+func (r *UIRegistry) Lookup(name string) (webutil.DataSource, error) {
 
 	r.rwmu.RLock()
 	defer r.rwmu.RUnlock()

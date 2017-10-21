@@ -1,4 +1,4 @@
-package caveman
+package webutil
 
 import (
 	"encoding/json"
@@ -9,7 +9,9 @@ import (
 
 var ErrNotJSONContent = errors.New("cannot parse, not json content")
 
-func JSONUnmarshalRequest(r *http.Request, v interface{}) error {
+// ParseJSON parses a request with content-type application/json into the struct you provide.
+// Uses json.Decoder.
+func ParseJSON(r *http.Request, v interface{}) error {
 
 	ct, _, _ := mime.ParseMediaType(r.Header.Get("content-type"))
 	if ct != "application/json" {
@@ -25,7 +27,9 @@ func JSONUnmarshalRequest(r *http.Request, v interface{}) error {
 	return nil
 }
 
-func JSONMarshalResponse(w http.ResponseWriter, status int, v interface{}) error {
+// WriteJSON writes a response as content-type application/json.
+// Uses json.Encoder.
+func WriteJSON(w http.ResponseWriter, v interface{}, status int) error {
 
 	w.Header().Set("content-type", "application/json")
 

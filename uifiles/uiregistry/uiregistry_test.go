@@ -1,6 +1,11 @@
 package uiregistry
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/gocaveman/caveman/webutil"
+)
 
 func TestUIRegistry(t *testing.T) {
 
@@ -8,9 +13,9 @@ func TestUIRegistry(t *testing.T) {
 
 	reg := NewUIRegistry()
 
-	reg.Register("js:jquery", nil, NewBytesDataSource([]byte("/*jquery.js*/")))
-	reg.Register("js:bootstrap", []string{"js:jquery"}, NewBytesDataSource([]byte("/*bootstrap.js*/")))
-	reg.Register("js:something", []string{"js:bootstrap"}, NewBytesDataSource([]byte("/*something.js*/")))
+	reg.Register("js:jquery", nil, webutil.NewBytesDataSource([]byte("/*jquery.js*/"), "jquery.js", time.Now()))
+	reg.Register("js:bootstrap", []string{"js:jquery"}, webutil.NewBytesDataSource([]byte("/*bootstrap.js*/"), "bootstrap.js", time.Now()))
+	reg.Register("js:something", []string{"js:bootstrap"}, webutil.NewBytesDataSource([]byte("/*something.js*/"), "something.js", time.Now()))
 
 	names, err := reg.ResolveDeps("js:something")
 	if err != nil {
