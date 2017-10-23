@@ -20,5 +20,7 @@ func TestDefaultFileNamer(t *testing.T) {
 	assert.Equal([]string(nil), fn.FileNames("/../example/"))
 	assert.Equal([]string(nil), fn.FileNames("/example/.html"))
 	assert.Equal([]string(nil), fn.FileNames("/example/."))
+	assert.Equal([]string(nil), fn.FileNames("/_example"))
+	assert.Equal([]string(nil), fn.FileNames("/example/_whatever"))
 
 }

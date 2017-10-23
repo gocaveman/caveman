@@ -5,12 +5,16 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"text/template/parse"
+
+	"github.com/gocaveman/caveman/webutil"
 )
 
 func NewIncludeModifier(includeFS http.FileSystem) TemplateModifier {
 	return TemplateModifierFunc(func(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
-		return ctx, t, tmplIncludeAll(includeFS, t)
+		err := tmplIncludeAll(includeFS, t)
+		return ctx, t, err
 	})
 }
 
@@ -50,13 +54,19 @@ func tmplIncludeNode(fs http.FileSystem, t *template.Template, node parse.Node) 
 			}
 		}
 
-		t2 := t.New(node.Name)
-
 		f, err := fs.Open(node.Name)
 		if err != nil {
+
+			// special case for missing file, we just leave it and let it error later as an undefined template
+			if os.IsNotExist(err) || err == webutil.ErrNotFound {
+				return nil
+			}
+
 			return err
 		}
 		defer f.Close()
+
+		t2 := t.New(node.Name)
 
 		b, err := ioutil.ReadAll(f)
 		if err != nil {

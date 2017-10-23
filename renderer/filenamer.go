@@ -19,7 +19,8 @@ func NewDefaultFileNamer(exts ...string) *DefaultFileNamer {
 		exts = []string{".gohtml", ".html", ".md"}
 	}
 	return &DefaultFileNamer{
-		Extensions: exts,
+		Extensions:    exts,
+		DisablePrefix: "_",
 	}
 }
 
@@ -42,8 +43,15 @@ func NewDefaultFileNamer(exts ...string) *DefaultFileNamer {
 //
 // Paths which are "unclean" (path.Clean("/"+p) returns something different, with the exception of the trailing slash)
 // will always return nil.
+//
+// Also, if any path component (folder or file name begins with "_", no filenames will be returned, effectively disabling that path).
+// This is intended to provide an easy way to make view templates that are not servable publicly but can still easily be called
+// from a handler/controller.
 type DefaultFileNamer struct {
+	// extensions to try
 	Extensions []string
+	// path components which start with this prefix are disabled, empty string means none are disable
+	DisablePrefix string
 }
 
 func (fn *DefaultFileNamer) withExts(p string) []string {
@@ -69,6 +77,17 @@ func (fn *DefaultFileNamer) FileNames(p string) []string {
 	}
 
 	p = newp
+
+	// check for any path component that has the disable prefix, if so then bail
+	if fn.DisablePrefix != "" {
+		parts := strings.Split(p, "/")
+		for _, p := range parts {
+			if strings.HasPrefix(p, fn.DisablePrefix) {
+				return nil
+			}
+		}
+	}
+
 	pbase := path.Base(p)
 
 	// slashes mean "index"

@@ -109,6 +109,7 @@ func New(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl {
 		AfterParse: TemplateModifierList{
 			NewIncludeModifier(includeFS),
 			NewRequireModifier(),
+			NewPlusModifier(),
 		},
 	}
 }

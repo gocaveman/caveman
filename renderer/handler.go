@@ -16,9 +16,17 @@ type PartNameFunc func(string) bool
 
 // RenderHandler implements http Handler and converts requests for pages into
 type RenderHandler struct {
-	FileNamer     FileNamer
-	Renderer      Renderer
-	PartNameFunc  PartNameFunc
+
+	// maps r.URL.Path to a list of possible filenames
+	FileNamer FileNamer
+
+	// the renderer to use
+	Renderer Renderer
+
+	// function to test against part names
+	PartNameFunc PartNameFunc
+
+	// parameter name which specifices the part to serve (if part serving is enabled)
 	PartNameParam string
 }
 
