@@ -1,7 +1,6 @@
 package fsutil
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -19,7 +18,6 @@ func NewHTTPStackedFileSystem(subfss ...http.FileSystem) *HTTPStackedFileSystem 
 }
 
 func (fs *HTTPStackedFileSystem) Open(name string) (ret http.File, err error) {
-	log.Printf("need a way to debug this, so we can find out which layer files are being found in")
 	for _, subfs := range fs.Stack {
 		ret, err = subfs.Open(name)
 		if err == nil {

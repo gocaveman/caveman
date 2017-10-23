@@ -61,7 +61,7 @@ func MainOnly(n int) {
 
 	r.ReadString('\n') // "goroutine N ..."
 
-	c := -1
+	c := -2
 	for {
 
 		line, err := r.ReadString('\n')
@@ -83,7 +83,7 @@ func MainOnly(n int) {
 		lineParts := strings.SplitN(line, ".", 2)
 
 		if lineParts[0] != "main" {
-			panic(fmt.Errorf("call must be made from main package, found %q instead", lineParts[0]))
+			panic(fmt.Errorf("call must be made from main package, found %q instead", line))
 		}
 
 		break
