@@ -17,3 +17,11 @@ package mailer
 // the context - it's worth a try).  Short of that, it should just be easy to see the messages
 // that are being sent.
 // It goes without saying that it should be fully usable from tests.
+
+// Consider the idea of supporting timed release emails that get sent at a later time unless cancelled.
+// They go into a table with all of the data needed for rendering and the time to be sent, you get the
+// ID back and a way to cancel it if the caller wants to before it's actualy sent.  This would allow
+// for things like a "please complete your registration" email that gets sent an hour later if it wasn't
+// cancelled by the time it's sent.  This would considerably add to the admin UI, because one would want
+// to be able to look through these.  It also would need to be able to scale up to a pretty large number
+// of messages.  Possibly this should be it's own package and it uses a mailer but has it's own interface.
