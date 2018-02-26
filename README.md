@@ -1,6 +1,6 @@
 # CAVEMAN
 
-Awesome website primitives for Go. One package at a time.
+*Awesome website primitives for Go. One package at a time.*
 
 The Caveman Project is a library, or more like a collection of packages, that provides tooling to solve common website and web application problems.
 
