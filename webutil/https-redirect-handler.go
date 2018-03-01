@@ -53,5 +53,7 @@ func (h *HTTPSRedirectHandler) ServeHTTPChain(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	h.HTTPSRedirect.ServeHTTP(w, r)
+
 	return w, r
 }
