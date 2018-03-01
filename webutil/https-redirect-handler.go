@@ -8,13 +8,13 @@ import (
 // NewHTTPSRedirectHandler creates a new HTTPSRedirectHandler using the defaults.
 func NewHTTPSRedirectHandler() *HTTPSRedirectHandler {
 	return &HTTPSRedirectHandler{
-		IgnorePathPrefixes: DefaultIgnorePathPrefixes,
+		IgnorePathPrefixes: DefaultHTTPSIgnorePathPrefixes,
 		HTTPSRedirect:      DefaultHTTPS302RedirectHandler,
 	}
 }
 
-// DefaultIgnorePathPrefixes are paths that we don't want to redirect to HTTPS.
-var DefaultIgnorePathPrefixes = []string{
+// DefaultHTTPSIgnorePathPrefixes are paths that we don't want to redirect to HTTPS.
+var DefaultHTTPSIgnorePathPrefixes = []string{
 	"/.well-known", // path prefix needed for LetsEncrypt support
 }
 
