@@ -1,6 +1,9 @@
 package webutil
 
-import "net/http"
+import (
+	"net"
+	"net/http"
+)
 
 // NewHTTPSRedirectHandler creates a new HTTPSRedirectHandler using the defaults.
 func NewHTTPSRedirectHandler() *HTTPSRedirectHandler {
@@ -26,7 +29,11 @@ type HTTPSRedirectHandler struct {
 var DefaultHTTPS302RedirectHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 	u := *r.URL
-	u.Host = u.Hostname()
+	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+		u.Host = h
+	} else {
+		u.Host = r.Host
+	}
 	u.Scheme = "https"
 	http.Redirect(w, r, u.String(), 302)
 })
@@ -36,7 +43,11 @@ var DefaultHTTPS302RedirectHandler = http.HandlerFunc(func(w http.ResponseWriter
 var DefaultHTTPS301RedirectHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 	u := *r.URL
-	u.Host = u.Hostname()
+	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+		u.Host = h
+	} else {
+		u.Host = r.Host
+	}
 	u.Scheme = "https"
 	http.Redirect(w, r, u.String(), 302)
 })
