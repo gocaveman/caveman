@@ -18,8 +18,8 @@ var OnlyReadableFromMain = true
 
 var reg webutil.NamedSequence
 
-// Register adds a new FileSystem to the view registry.  Duplicates (seq, name or value) are not detected or prevented.
-func Register(seq float64, name string, viewFS http.FileSystem) {
+// MustRegister adds a new FileSystem to the view registry.  Duplicates (seq, name or value) are not detected or prevented.
+func MustRegister(seq float64, name string, viewFS http.FileSystem) {
 	reg = append(reg, webutil.NamedSequenceItem{Sequence: seq, Name: name, Value: viewFS})
 }
 

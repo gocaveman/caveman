@@ -17,7 +17,11 @@ var ErrNotFound = errors.New("not found")
 // FIXME: Instead of a variable, I think we need two function calls - one to get something that implements
 // an interface for registering, and another that returns an interface that can read.  In the read call we
 // can verify it is called from main - webutil.MainOnly()
-var Global = NewUIRegistry()
+var global = NewUIRegistry()
+
+func Contents() *UIRegistry {
+	return global
+}
 
 func ParseName(s string) (typ, name string, err error) {
 	parts := strings.Split(s, ":")
@@ -25,6 +29,14 @@ func ParseName(s string) (typ, name string, err error) {
 		return "", "", fmt.Errorf("expected exactly two colon separated parts but instead found %d part(s)", len(parts))
 	}
 	return parts[0], parts[1], nil
+}
+
+func MustRegister(name string, deps []string, ds webutil.DataSource) {
+	global.MustRegister(name, deps, ds)
+}
+
+func Register(name string, deps []string, ds webutil.DataSource) error {
+	return global.Register(name, deps, ds)
 }
 
 // NewUIRegistry makes a new empty initialized UIRegistry.

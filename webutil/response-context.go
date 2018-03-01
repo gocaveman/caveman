@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"log"
 	"net"
 	"net/http"
 )
@@ -54,6 +55,7 @@ func (w *ContextCancelResponseWriter) WriteHeader(c int) {
 }
 
 func (w *ContextCancelResponseWriter) Close() (err error) {
+	log.Printf("FIXME: Close() is probably not a good idea - using Flush() instead of Close keeps to the existing API and can serve the same purpose")
 	w.cancelFunc()
 	if c, ok := w.ResponseWriter.(io.Closer); ok {
 		err = c.Close()

@@ -1,12 +1,32 @@
-<!doctype>
 <!DOCTYPE html>
+{{$fs := $.Value "uifiles.FileSet"}}
 <html>
 <head>
-	
+{{define "require css:github.com/gocaveman-libs/bootstrap4css"}}{{end}}
+
+{{if $fs}}{{with $fs.BuildSetPath "css"}}
+<link rel="stylesheet" type="text/css" href="{{.}}">
+{{end}}{{end}}
+
+{{block "style+" .}}{{end}}
+
 </head>
 <body>
 
+{{template "header.gohtml" .}}
+
+<div class="container">
 {{block "body" .}}{{end}}
+</div>
+
+{{template "footer.gohtml" .}}
+
+{{if $fs}}{{with $fs.BuildSetPath "js"}}
+<script src="{{.}}"></script>
+{{end}}{{end}}
+
+{{/* block "script" .*/}}{{/*end*/}}
+{{block "script+" .}}{{end}}
 
 </body>
 </html>

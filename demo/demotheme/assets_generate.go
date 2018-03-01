@@ -17,7 +17,7 @@ func main() {
 	wd, _ := os.Getwd()
 	includesDir := filepath.Join(wd)
 	includesFS := afero.NewHttpFs(afero.NewRegexpFs(afero.NewBasePathFs(afero.NewOsFs(), includesDir),
-		regexp.MustCompile(`\.(gohtml|html|css|js)$`)))
+		regexp.MustCompile(`\.(gohtml|html|css|js|png|jpg|gif|svg)$`)))
 
 	err := vfsgen.Generate(includesFS, vfsgen.Options{
 		PackageName:  "demotheme",

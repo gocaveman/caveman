@@ -7,12 +7,14 @@ import (
 	"github.com/gocaveman/caveman/filesystem/fsutil"
 	"github.com/gocaveman/caveman/renderer/includeregistry"
 	"github.com/gocaveman/caveman/renderer/viewregistry"
+	"github.com/gocaveman/caveman/webutil/staticregistry"
+
+	_ "github.com/gocaveman-libs/bootstrap4css"
 )
 
 //go:generate go run assets_generate.go
 
-// need to implement includeregistry
-// and get binary packaging figured out
+// TODO: get binary packaging fully figured out
 
 func init() {
 
@@ -24,7 +26,12 @@ func init() {
 		return assets.Open("views/" + name)
 	})
 
-	includeregistry.Register(100, "demotheme", includesFS)
-	viewregistry.Register(100, "demotheme", viewsFS)
+	staticFS := fsutil.NewHTTPFuncFS(func(name string) (http.File, error) {
+		return assets.Open("static/" + name)
+	})
+
+	includeregistry.MustRegister(100, "demotheme", includesFS)
+	viewregistry.MustRegister(100, "demotheme", viewsFS)
+	staticregistry.MustRegister(100, "demotheme", staticFS)
 
 }

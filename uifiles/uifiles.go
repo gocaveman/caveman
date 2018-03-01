@@ -739,15 +739,22 @@ func (fs *FileSet) FilePathsNoPrefix(filterType string) ([]string, error) {
 	return ret, nil
 }
 
+// BuildSetPath is like BuildSetPathNoPrefix but contains the appropriate prefix to form a full path.
 func (fs *FileSet) BuildSetPath(filterType string) (string, error) {
 	ret, err := fs.BuildSetPathNoPrefix(filterType)
+
+	// special case for empty
+	if ret == "" {
+		return "", nil
+	}
+
 	return fs.fileMangler.URLPrefix + "/" + ret, err
 }
 
-// BuildSetPath performs file combination and whatever else to build the specified set and returns the path name (intended for output in the HTML page).
-// You can call BuildSetPath as many times as you want for a given set but once it is called you must not call UIRequire() again for this FileSet (for this HTTP request).
+// BuildSetPathNoPrefix performs file combination and whatever else to build the specified set and returns the path name (intended for output in the HTML page).
+// You can call BuildSetPath/BuildSetPathNoPrefix as many times as you want for a given set but once it is called you must not call UIRequire() again for this FileSet (for this HTTP request).
 // If everything is cached, this operation could return very quickly.
-// The setName is usually either "js" or "css".
+// The setName is usually either "js" or "css".  An empty string will be returned if no files are in the set.
 func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (ret string, reterr error) {
 
 	// use uiResolver to add depedencies and sort and to separate into resolveFiles and localFiles
@@ -762,6 +769,11 @@ func (fs *FileSet) BuildSetPathNoPrefix(filterType string) (ret string, reterr e
 	bothFiles := make(FileEntryList, 0, len(resolveFiles)+len(localFiles))
 	bothFiles = append(bothFiles, resolveFiles...)
 	bothFiles = append(bothFiles, localFiles...)
+
+	// special case for empty
+	if len(bothFiles) == 0 {
+		return "", nil
+	}
 
 	// calculate the token suffix part if needed - we're going to need it later
 	tokenSuffix := ""

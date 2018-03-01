@@ -1,7 +1,6 @@
-// The includeregistry provides registration for default includes.
-// Generally used by templates or other things that want to provide paths you can access
-// through a template call in a Renderer.
-package includeregistry
+// The staticregistry provides registration for default static assets.
+// Generally used by templates to provide static assets like images, fonts, etc.
+package staticregistry
 
 import (
 	"log"
@@ -21,8 +20,8 @@ var OnlyReadableFromMain = true
 var reg webutil.NamedSequence
 
 // MustRegister adds a new FileSystem to the include registry.  Duplicates (seq, name or value) are not detected or prevented.
-func MustRegister(seq float64, name string, includeFS http.FileSystem) {
-	reg = append(reg, webutil.NamedSequenceItem{Sequence: seq, Name: name, Value: includeFS})
+func MustRegister(seq float64, name string, staticFS http.FileSystem) {
+	reg = append(reg, webutil.NamedSequenceItem{Sequence: seq, Name: name, Value: staticFS})
 }
 
 // Contents returns the current contents of the registry as a NamedSequence.
@@ -70,7 +69,7 @@ func MakeFS(overrideFS http.FileSystem, contents webutil.NamedSequence, debug bo
 			fs = fsutil.NewHTTPFuncFS(func(name string) (http.File, error) {
 				f, err := itemFS.Open(name)
 				if f != nil {
-					log.Printf("Include file opened (sequence=%v, name=%q): %s", item.Sequence, item.Name, name)
+					log.Printf("Static file opened (sequence=%v, name=%q): %s", item.Sequence, item.Name, name)
 				}
 				return f, err
 			})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -75,6 +76,7 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 func (hl HandlerList) WithCloseHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w, r = hl.ServeHTTPChain(w, r)
+		log.Printf("FIXME: we should not be using Close() here but Flush() instead")
 		w.(io.Closer).Close()
 	})
 }
