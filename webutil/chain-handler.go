@@ -11,6 +11,8 @@ import (
 // ChainHandler is a slight variation of http.Handler which returns a new "w" and "r", allowing for them to be changed or replaced
 // (and thus allowing the request context to be changed as well).
 type ChainHandler interface {
+	// FIXME: Possibly ServeHTTPChain should be used for any situation where the response is not sent -
+	// rather than also letting ServeHTTP pass through.
 	ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request)
 }
 
