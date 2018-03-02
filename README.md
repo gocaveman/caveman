@@ -1,4 +1,4 @@
-# CAVEMAN
+# THE CAVEMAN PROJECT
 
 **Awesome web primitives for Go. One package at a time.**
 
