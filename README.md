@@ -10,8 +10,10 @@ The listing below gives the current status of packages within the Caveman projec
 
 ## Packages
 
-* [github.com/gocaveman/caveman/renderer](https://godoc.org/github.com/gocaveman/caveman/renderer) **EXPERIMENTAL** Easy page rendering using html/template.
-* [github.com/gocaveman/caveman/uifiles](https://godoc.org/github.com/gocaveman/caveman/uifiles) **EXPERIMENTAL** Tooling for CSS and JS minification, combination and inclusion on page.
-* [github.com/gocaveman/caveman/webutil](https://godoc.org/github.com/gocaveman/caveman/webutil) **INCOMPLETE**
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [github.com/gocaveman/caveman/renderer](https://godoc.org/github.com/gocaveman/caveman/renderer) | Easy page rendering using html/template. | **EXPERIMENTAL** |
+| [github.com/gocaveman/caveman/uifiles](https://godoc.org/github.com/gocaveman/caveman/uifiles) | Tooling for CSS and JS minification, combination and inclusion on page. | **EXPERIMENTAL** |
+| [github.com/gocaveman/caveman/webutil](https://godoc.org/github.com/gocaveman/caveman/webutil) | Various common tools; handler chain support | **INCOMPLETE** |
 
 NOTE: Packages in the [Caveman](https://godoc.org/github.com/gocaveman/caveman) repository but not listed above should be considered INCOMPLETE and subject to major changes or even removal.
