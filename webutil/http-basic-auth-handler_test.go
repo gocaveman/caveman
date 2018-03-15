@@ -13,12 +13,9 @@ func TestBasicAuthHandler(t *testing.T) {
 	assert := assert.New(t)
 
 	h := NewBasicAuthOneHandler("joe", "secret")
-	var hl HandlerList
-	hl = append(hl, NewContextCancelHandler())
-	hl = append(hl, h)
-	hl = append(hl, http.NotFoundHandler())
+	hl := NewDefaultHandlerList(h, http.NotFoundHandler())
 
-	s := httptest.NewServer(hl.WithCloseHandler())
+	s := httptest.NewServer(hl)
 	defer s.Close()
 
 	client := s.Client()

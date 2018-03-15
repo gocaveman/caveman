@@ -3,8 +3,6 @@ package webutil
 import (
 	"bufio"
 	"context"
-	"io"
-	"log"
 	"net"
 	"net/http"
 )
@@ -54,20 +52,24 @@ func (w *ContextCancelResponseWriter) WriteHeader(c int) {
 	w.ResponseWriter.WriteHeader(c)
 }
 
-func (w *ContextCancelResponseWriter) Close() (err error) {
-	log.Printf("FIXME: Close() is probably not a good idea - using Flush() instead of Close keeps to the existing API and can serve the same purpose")
-	w.cancelFunc()
-	if c, ok := w.ResponseWriter.(io.Closer); ok {
-		err = c.Close()
-	}
-	return err
-}
+// func (w *ContextCancelResponseWriter) Close() (err error) {
+// 	log.Printf("FIXME: Close() is probably not a good idea - using Flush() instead of Close keeps to the existing API and can serve the same purpose")
+// 	w.cancelFunc()
+// 	if c, ok := w.ResponseWriter.(io.Closer); ok {
+// 		err = c.Close()
+// 	}
+// 	return err
+// }
 
+// Flush cancels the context and calls Flush on the underlying ResponseWriter.
 func (w *ContextCancelResponseWriter) Flush() {
+	w.cancelFunc()
 	w.ResponseWriter.(http.Flusher).Flush()
 }
 
+// Hijack cancels the context and calls Hijack on the underlying ResponseWriter.
 func (w *ContextCancelResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.cancelFunc()
 	return w.ResponseWriter.(http.Hijacker).Hijack()
 }
 

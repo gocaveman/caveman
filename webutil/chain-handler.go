@@ -3,8 +3,6 @@ package webutil
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 )
 
@@ -21,6 +19,27 @@ type ChainHandlerFunc func(w http.ResponseWriter, r *http.Request) (wnext http.R
 
 func (f ChainHandlerFunc) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request) {
 	return f(w, r)
+}
+
+// NewDefaultHandlerList takes a set of handlers and returns a HandlerList with
+// a ContextCancelHandler and GzipHandler prepended.  (But only if handlers
+// does not already start with a ContextCancelHandler.)
+func NewDefaultHandlerList(handlers ...interface{}) HandlerList {
+
+	var firstHandler interface{}
+	if len(handlers) > 0 {
+		firstHandler = handlers[0]
+	}
+
+	if _, ok := firstHandler.(ContextCancelHandler); !ok {
+		origHandlers := handlers
+		handlers = make([]interface{}, 0, len(handlers)+2)
+		handlers = append(handlers, NewContextCancelHandler())
+		handlers = append(handlers, NewGzipHandler())
+		handlers = append(handlers, origHandlers...)
+	}
+
+	return HandlerList(handlers)
 }
 
 // HandlerList is a slice of ChainHandler or http.Handler instances.
@@ -50,7 +69,7 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 	for _, h := range hl {
 
 		if r.Context().Err() != nil {
-			return w, r
+			break
 		}
 
 		// try ChainHandler first
@@ -70,18 +89,35 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 		panic(fmt.Errorf("item in HandlerList (type=%t, val=%+v) is not a ChainHandler nor http.Handler", h, h))
 	}
 
+	// call flush to ensure gzip and other things get their chance to cleanup
+	w.(http.Flusher).Flush()
+
 	return w, r
 }
 
-// WithCloseHandler returns an http.Handler that calls ServeHTTPChain and then w.(io.Closer).Close().
-// You normally want to use this as your top-level Handler that is called from the HTTP server.
-func (hl HandlerList) WithCloseHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w, r = hl.ServeHTTPChain(w, r)
-		log.Printf("FIXME: we should not be using Close() here but Flush() instead")
-		w.(io.Closer).Close()
-	})
-}
+// // WithCloseHandler returns an http.Handler that calls ServeHTTPChain and then w.(io.Closer).Close().
+// // You normally want to use this as your top-level Handler that is called from the HTTP server.
+// func (hl HandlerList) WithCloseHandler() http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		w, r = hl.ServeHTTPChain(w, r)
+// 		log.Printf("FIXME: we should not be using Close() here but Flush() instead")
+// 		w.(io.Closer).Close()
+// 	})
+// }
+
+// // FlushHandler calls Flush on the ResponseWriter.  It's important to have this at
+// // the end of your HandlerList so that gzip output can be flushed or other things that
+// // need to know when the output is written can take appropriate action.
+// type FlushHandler struct{}
+
+// func (h FlushHandler) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *http.Request) {
+// 	w.(http.Flusher).Flush()
+// 	return w, r
+// }
+
+// func NewFlushHandler() FlushHandler {
+// 	return FlushHandler{}
+// }
 
 // ServeHTTPChain checks h to see if it implements ChainHandler and calls ServeHTTPChain if so.  Otherwise it falls
 // back to http.Handler and ServeHTTP.  The returned w and r will be as returned by ServeHTTPChain or if

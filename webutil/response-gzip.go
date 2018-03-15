@@ -3,7 +3,6 @@ package webutil
 import (
 	"bufio"
 	"compress/gzip"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -40,8 +39,9 @@ func (h GzipHandler) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (htt
 
 type GzipResponseWriter struct {
 	http.ResponseWriter
-	gzw     *gzip.Writer
-	written bool
+	gzw      *gzip.Writer
+	written  bool
+	hijacked bool
 }
 
 func (w *GzipResponseWriter) Write(p []byte) (int, error) {
@@ -77,20 +77,26 @@ func (w *GzipResponseWriter) WriteHeader(c int) {
 	w.ResponseWriter.WriteHeader(c)
 }
 
-func (w *GzipResponseWriter) Close() (err error) {
-	w.gzw.Close()
-	if c, ok := w.ResponseWriter.(io.Closer); ok {
-		err = c.Close()
-	}
-	return err
-}
+// func (w *GzipResponseWriter) Close() (err error) {
+// 	w.gzw.Close()
+// 	if c, ok := w.ResponseWriter.(io.Closer); ok {
+// 		err = c.Close()
+// 	}
+// 	return err
+// }
 
+// Flush calls Flush on the gzip.Writer and then the underlying ResponseWriter
 func (w *GzipResponseWriter) Flush() {
+	// do nothing if hijacked
+	if w.hijacked {
+		return
+	}
 	w.gzw.Flush()
 	w.ResponseWriter.(http.Flusher).Flush()
 }
 
 func (w *GzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
 	return w.ResponseWriter.(http.Hijacker).Hijack()
 }
 
