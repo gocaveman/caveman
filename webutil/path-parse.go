@@ -52,5 +52,9 @@ func HasPathPrefix(path string, prefix string) bool {
 	if path == prefix {
 		return true
 	}
+	// special case to make prefix "/" match everything as would be expected
+	if prefix == "/" {
+		prefix = ""
+	}
 	return strings.HasPrefix(path, prefix+"/")
 }
