@@ -62,9 +62,9 @@ func (hl HandlerList) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hl.ServeHTTPChain(w, r)
 }
 
-// ServeHTTPChain calls each element in the list. trying as ChainHandler first and if that fails then http.Handler.
-// Will panic if you put any other type in the slice.
-func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request) {
+// ServeHTTPChainNoFlush does the same thing as ServeHTTPChain but
+// does not call w.Flush() at the end.
+func (hl HandlerList) ServeHTTPChainNoFlush(w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request) {
 
 	for _, h := range hl {
 
@@ -88,6 +88,15 @@ func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wn
 
 		panic(fmt.Errorf("item in HandlerList (type=%t, val=%+v) is not a ChainHandler nor http.Handler", h, h))
 	}
+
+	return w, r
+}
+
+// ServeHTTPChain calls each element in the list. trying as ChainHandler first and if that fails then http.Handler.
+// Will panic if you put any other type in the slice.
+func (hl HandlerList) ServeHTTPChain(w http.ResponseWriter, r *http.Request) (wnext http.ResponseWriter, rnext *http.Request) {
+
+	w, r = hl.ServeHTTPChainNoFlush(w, r)
 
 	// call flush to ensure gzip and other things get their chance to cleanup
 	w.(http.Flusher).Flush()
