@@ -1,6 +1,6 @@
 package migrateregistry
 
-import "onestepgps/migrate"
+import "github.com/gocaveman/caveman/migrate"
 
 var global migrate.MigrationList
 
