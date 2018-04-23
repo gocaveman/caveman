@@ -7,14 +7,26 @@ import (
 	"github.com/gocaveman/caveman/webutil"
 )
 
-func MustRegister(seq float64, name string, h interface{}) {
+var OnlyReadableFromMain = true
 
+var reg webutil.NamedSequence
+
+// Contents returns the current contents of the registry as a NamedSequence.
+func Contents() webutil.NamedSequence {
+	if OnlyReadableFromMain {
+		webutil.MainOnly(1)
+	}
+	return reg.SortedCopy()
+}
+
+func MustRegister(seq float64, name string, h interface{}) {
+	reg = append(reg, webutil.NamedSequenceItem{Sequence: seq, Name: name, Value: h})
 }
 
 func MustRegisterHandler(seq float64, name string, h http.Handler) {
-
+	MustRegister(seq, name, h)
 }
 
 func MustRegisterChainHandler(seq float64, name string, ch webutil.ChainHandler) {
-
+	MustRegister(seq, name, ch)
 }
