@@ -1,3 +1,4 @@
+// Manage and apply/unapply database schema changes, grouped by category and db driver.
 package migrate
 
 import (
@@ -11,6 +12,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"text/template"
 )
 
 // multiple named migrations
@@ -21,6 +23,7 @@ import (
 
 // what about "minimum veresion required for this code to run"
 
+// Versioner interface is implemented by things that record which version is applied to a database and category.
 type Versioner interface {
 	Categories() ([]string, error)
 	Version(category string) (string, error)
@@ -28,6 +31,7 @@ type Versioner interface {
 	EndVersionChange(category, newVersionName string) error
 }
 
+// NewRunner creates a Runner.
 func NewRunner(driverName, dsn string, versioner Versioner, migrations MigrationList) *Runner {
 	return &Runner{
 		DriverName: driverName,
@@ -37,6 +41,7 @@ func NewRunner(driverName, dsn string, versioner Versioner, migrations Migration
 	}
 }
 
+// Runner is used to apply migration changes.
 type Runner struct {
 	DriverName string
 	DSN        string
@@ -49,8 +54,10 @@ type Runner struct {
 // at startup, but for staging and production we'll instead just check at startup
 // and show messages if migrations are needed.
 
+// CheckResult is a list of CheckResultItem
 type CheckResult []CheckResultItem
 
+// CheckResultItem gives the current and latest versions for a specific driver/dsn/category.
 type CheckResultItem struct {
 	DriverName     string
 	DSN            string
@@ -59,6 +66,7 @@ type CheckResultItem struct {
 	LatestVersion  string
 }
 
+// IsCurrent returns true if latest version is current version.
 func (i CheckResultItem) IsCurrent() bool {
 	return i.CurrentVersion == i.LatestVersion
 }
@@ -180,6 +188,8 @@ func (r *Runner) RunTo(category, targetVersion string) error {
 	return r.RunUpTo(category, targetVersion)
 }
 
+// RunUpTo runs migrations up to a specific version. Will only run up, will error if
+// this version is lower than the current one.
 func (r *Runner) RunUpTo(category, targetVersion string) error {
 
 	curVer, err := r.Versioner.Version(category)
@@ -241,6 +251,8 @@ func (r *Runner) RunUpTo(category, targetVersion string) error {
 
 }
 
+// RunUpTo runs migrations down to a specific version. Will only run down, will error if
+// this version is higher than the current one.
 func (r *Runner) RunDownTo(category, targetVersion string) error {
 
 	// log.Printf("RunDownTo %q %q", category, targetVersion)
@@ -320,6 +332,7 @@ type Migration interface {
 	ExecDown(dsn string) error
 }
 
+// MigrationList is a slice of Migration
 type MigrationList []Migration
 
 func (p MigrationList) String() string {
@@ -346,6 +359,7 @@ func (p MigrationList) Less(i, j int) bool {
 
 }
 
+// HasVersion returns true if this has has an item with this version name.
 func (ml MigrationList) HasVersion(ver string) bool {
 	vers := ml.Versions()
 	for _, v := range vers {
@@ -617,6 +631,79 @@ func (m *SQLMigration) ExecUp(dsn string) error {
 
 func (m *SQLMigration) ExecDown(dsn string) error {
 	return m.exec(dsn, m.DownSQL)
+}
+
+// SQLTmplMigration implements Migration with a simple slice of strings which are
+// interpreted as Go templates with SQL as the up and down migration steps.
+// This allows you to customize the SQL with things like table prefixes.
+// Template are executed using text/template and the SQLTmplMigration instance
+// is passed as the data to the Execute() call.
+type SQLTmplMigration struct {
+	DriverNameValue string
+	CategoryValue   string
+	VersionValue    string
+	UpSQL           []string
+	DownSQL         []string
+
+	// a common reason to use SQLTmplMigration is be able to configure the table prefix
+	TablePrefix string `autowire:"db_table_prefix,optional"`
+	// other custom data needed by the template(s) can go here
+	Data interface{}
+}
+
+// NewWithDriverName as a convenience returns a copy with DriverNameValue set to the specified value.
+func (m *SQLTmplMigration) NewWithDriverName(driverName string) *SQLTmplMigration {
+	ret := *m
+	ret.DriverNameValue = driverName
+	return &ret
+}
+
+func (m *SQLTmplMigration) DriverName() string { return m.DriverNameValue }
+func (m *SQLTmplMigration) Category() string   { return m.CategoryValue }
+func (m *SQLTmplMigration) Version() string    { return m.VersionValue }
+
+func (m *SQLTmplMigration) tmplExec(dsn string, stmts []string) error {
+
+	db, err := sql.Open(m.DriverNameValue, dsn)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	for n, s := range stmts {
+
+		t := template.New("sql")
+		t, err := t.Parse(s)
+		if err != nil {
+			return fmt.Errorf("SQLTmplMigration (driverName=%q, category=%q, version=%q, stmtidx=%d) template parse on dsn=%q failed with error: %v\nSQL Statement:\n%s",
+				m.DriverNameValue, m.CategoryValue, m.VersionValue, n, dsn, err, s)
+		}
+
+		var buf bytes.Buffer
+		err = t.Execute(&buf, m)
+		if err != nil {
+			return fmt.Errorf("SQLTmplMigration (driverName=%q, category=%q, version=%q, stmtidx=%d) template execute on dsn=%q failed with error: %v\nSQL Statement:\n%s",
+				m.DriverNameValue, m.CategoryValue, m.VersionValue, n, dsn, err, s)
+		}
+
+		newS := buf.String()
+
+		_, err = db.Exec(newS)
+		if err != nil {
+			return fmt.Errorf("SQLTmplMigration (driverName=%q, category=%q, version=%q, stmtidx=%d) Exec on dsn=%q failed with error: %v\nSQL Statement:\n%s",
+				m.DriverNameValue, m.CategoryValue, m.VersionValue, n, dsn, err, newS)
+		}
+	}
+
+	return nil
+}
+
+func (m *SQLTmplMigration) ExecUp(dsn string) error {
+	return m.tmplExec(dsn, m.UpSQL)
+}
+
+func (m *SQLTmplMigration) ExecDown(dsn string) error {
+	return m.tmplExec(dsn, m.DownSQL)
 }
 
 // NewFuncsMigration makes and returns a new FuncsMigration pointer with the data you provide.

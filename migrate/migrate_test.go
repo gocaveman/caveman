@@ -3,8 +3,7 @@ package migrate
 import (
 	"testing"
 
-	"onestepgps/migrate/migratedbr"
-
+	"github.com/gocaveman/caveman/migrate/migratedbr"
 	"github.com/gocraft/dbr"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -167,4 +166,48 @@ func TestRunner(t *testing.T) {
 	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadValue(&name)
 	assert.NoError(err)
 
+}
+
+func TestSQLTmplMigration(t *testing.T) {
+
+	assert := assert.New(t)
+
+	dsn := `file:TestSQLTmplMigration?mode=memory&cache=shared`
+	driverName := "sqlite3"
+
+	var ml MigrationList
+	ml = append(ml, &SQLTmplMigration{
+		DriverNameValue: driverName,
+		CategoryValue:   "example1",
+		VersionValue:    "0001",
+		TablePrefix:     "prefix_",
+		UpSQL: []string{`
+			CREATE TABLE {{.TablePrefix}}test1(
+				id TEXT,
+				name TEXT,
+				PRIMARY KEY(id)
+			);
+		`},
+		DownSQL: []string{`
+			DROP TABLE {{.TablePrefix}}test1;
+		`},
+	})
+
+	versioner, err := migratedbr.New(driverName, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner := NewRunner(driverName, dsn, versioner, ml)
+
+	err = runner.RunAllUpToLatest()
+	assert.NoError(err)
+
+	conn, err := dbr.Open(driverName, dsn, nil)
+	assert.NoError(err)
+
+	sess := conn.NewSession(nil)
+
+	_, err = sess.InsertInto("prefix_test1").Columns("id", "name").Values("k1", "Key 1").Exec()
+	assert.NoError(err)
 }
