@@ -581,6 +581,13 @@ type SQLMigration struct {
 	DownSQL         []string
 }
 
+// NewWithDriverName as a convenience returns a copy with DriverNameValue set to the specified value.
+func (m *SQLMigration) NewWithDriverName(driverName string) *SQLMigration {
+	ret := *m
+	ret.DriverNameValue = driverName
+	return &ret
+}
+
 func (m *SQLMigration) DriverName() string { return m.DriverNameValue }
 func (m *SQLMigration) Category() string   { return m.CategoryValue }
 func (m *SQLMigration) Version() string    { return m.VersionValue }
