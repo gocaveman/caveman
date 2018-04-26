@@ -14,6 +14,10 @@ import (
 
 var ErrNotFound = webutil.ErrNotFound
 
+// TODO: figure out how a CheckValid() (or similar) method fits into this.
+// While the rules are very useful, the ability to just add custom validation
+// code to a struct with a simple function should not be underestimated
+// and it should be fully supported.
 func Obj(obj interface{}, rules Rules) error {
 
 	objv := reflect.ValueOf(obj)
