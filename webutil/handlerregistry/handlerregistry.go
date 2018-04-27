@@ -7,6 +7,14 @@ import (
 	"github.com/gocaveman/caveman/webutil"
 )
 
+const (
+	SeqFirst      = float64(0)   // processed first
+	SeqMiddleware = float64(20)  // middleware can modify before controllers are processed
+	SeqCtrl       = float64(50)  // controllers do the main HTTP handling
+	SeqRender     = float64(80)  // page rendering happens after other stuff is processed
+	SeqLast       = float64(100) // processed last
+)
+
 var OnlyReadableFromMain = true
 
 var reg webutil.NamedSequence
