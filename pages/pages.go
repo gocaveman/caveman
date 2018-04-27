@@ -1,3 +1,6 @@
+// FIXME: consider structuring this as PageStore interface, which looks similar
+// to a regular "Store" interface, but we have implementations for database
+// and file system.
 // Index and iteration for list of pages available on a site plus metadata,
 // used by various other things that need to get a list of all available pages
 // and to provide the various pieces of metadata for each page.
