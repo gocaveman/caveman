@@ -42,10 +42,10 @@ func TestPathParse(t *testing.T) {
 	// path does not include all elements
 	assert.NotNil(PathParse("/something/123/else/abc", "/something/%d/else/%s/what", &i, &s))
 
-	// path does not include all elements
-	assert.NotNil(PathParse("/something/123/else/abc", "/something/%d/else", &i, &s))
+	// path has too many elements
+	assert.NotNil(PathParse("/something/123/else/abc", "/something/%d/else", &i))
 
-	// path does not include all elements
-	assert.NotNil(PathParse("/something/123/else/abc", "/something/%d", &i, &s))
+	// path has too many elements
+	assert.NotNil(PathParse("/something/123/else/abc", "/something/%d", &i))
 
 }

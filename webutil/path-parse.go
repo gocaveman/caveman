@@ -36,8 +36,14 @@ func PathParse(path string, format string, a ...interface{}) error {
 
 	n, err := fmt.Sscanf(fpath, fformat, args...)
 
+	// log.Printf("fpath=%q, fformat=%q, args=%#v; n=%v, err=%v; len(a)=%v", fpath, fformat, args, n, err, len(a))
+
 	if n == len(a) && (err == io.EOF || err == nil) {
 		return nil
+	}
+
+	if n != len(a) {
+		return fmt.Errorf("expected %d args but read %d", len(a), n)
 	}
 
 	return err
@@ -51,10 +57,6 @@ func PathParse(path string, format string, a ...interface{}) error {
 func HasPathPrefix(path string, prefix string) bool {
 	if path == prefix {
 		return true
-	}
-	// special case to make prefix "/" match everything as would be expected
-	if prefix == "/" {
-		prefix = ""
 	}
 	return strings.HasPrefix(path, prefix+"/")
 }
