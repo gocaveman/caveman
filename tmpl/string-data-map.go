@@ -14,9 +14,9 @@ import (
 // This interface matches StringDataMap in the pageinfo package, so the meta data
 // is interoperable.  Implementations are not thread-safe.
 type StringDataMap interface {
-	Entry(key string) interface{}
+	Value(key string) interface{}
 	Keys() []string
-	SetEntry(key string, val interface{}) // SetEntry("key", nil) will delete "key"
+	Set(key string, val interface{}) // Set("key", nil) will delete "key"
 }
 
 // YAMLStringDataMap implements StringDataMap supporting a subset of YAML and
@@ -36,7 +36,7 @@ func (m *YAMLStringDataMap) rebuildEntryMap() {
 
 }
 
-func (m *YAMLStringDataMap) Entry(key string) interface{} {
+func (m *YAMLStringDataMap) Value(key string) interface{} {
 	i, ok := m.entryMap[key]
 	if !ok {
 		return nil
@@ -51,7 +51,7 @@ func (m *YAMLStringDataMap) Keys() (ret []string) {
 	return
 }
 
-func (m *YAMLStringDataMap) SetEntry(key string, val interface{}) {
+func (m *YAMLStringDataMap) Set(key string, val interface{}) {
 
 	i, ok := m.entryMap[key]
 	if !ok {

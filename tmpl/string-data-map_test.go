@@ -38,16 +38,16 @@ deleteme: here
 	t.Logf("DATA: %#v", m)
 
 	// delete an entry that is not there
-	m.SetEntry("nonexistent entry", nil)
+	m.Set("nonexistent entry", nil)
 
 	// delete an entry that is there
-	m.SetEntry("deleteme", nil)
+	m.Set("deleteme", nil)
 
 	// update an existing entry
-	m.SetEntry("something", "blah_updated")
+	m.Set("something", "blah_updated")
 
 	// add a new entry
-	m.SetEntry("somethingnew", "newvalue")
+	m.Set("somethingnew", "newvalue")
 
 	var buf bytes.Buffer
 	err = WriteYAMLStringDataMap(&buf, m)
