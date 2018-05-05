@@ -7,11 +7,36 @@ import (
 	"net/http"
 	"os"
 	"text/template/parse"
+	"time"
 
+	"github.com/gocaveman/caveman/filesystem/fsutil"
 	"github.com/gocaveman/caveman/webutil"
 )
 
-func NewIncludeModifier(includeFS http.FileSystem) TemplateModifier {
+func NewIncludeTemplateReaderModifier(tr TemplateReader, category string) TemplateModifier {
+	if category == "" {
+		category = IncludesCategory
+	}
+	return TemplateModifierFunc(func(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
+
+		includeFS := fsutil.NewHTTPFuncFS(func(name string) (http.File, error) {
+
+			body, _, _, err := tr.ReadTemplate(category, name)
+			if err != nil {
+				return nil, err
+			}
+
+			f := fsutil.NewHTTPBytesFile(name, time.Now(), body)
+
+			return f, nil
+		})
+
+		err := tmplIncludeAll(includeFS, t)
+		return ctx, t, err
+	})
+}
+
+func NewIncludeFSModifier(includeFS http.FileSystem) TemplateModifier {
 	return TemplateModifierFunc(func(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
 		err := tmplIncludeAll(includeFS, t)
 		return ctx, t, err

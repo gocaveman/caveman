@@ -7,17 +7,21 @@ import (
 	"io"
 	"strings"
 
+	"github.com/gocaveman/caveman/webutil"
 	yaml "gopkg.in/yaml.v2"
 )
 
-// StringDataMap describes a map of string keys and generic interface values.
-// This interface matches StringDataMap in the pageinfo package, so the meta data
-// is interoperable.  Implementations are not thread-safe.
-type StringDataMap interface {
-	Value(key string) interface{}
-	Keys() []string
-	Set(key string, val interface{}) // Set("key", nil) will delete "key"
-}
+// // StringDataMap describes a map of string keys and generic interface values.
+// // This interface matches StringDataMap in the pageinfo package, so the meta data
+// // is interoperable.  Implementations are not thread-safe.
+// type StringDataMap interface {
+// 	Value(key string) interface{}
+// 	Keys() []string
+// 	Set(key string, val interface{}) // Set("key", nil) will delete "key"
+// }
+
+// type check
+var _ webutil.StringDataMap = &YAMLStringDataMap{}
 
 // YAMLStringDataMap implements StringDataMap supporting a subset of YAML and
 // facilitates reading and writing while attempting to preserve comments and sequence.
@@ -28,6 +32,18 @@ type YAMLStringDataMap struct {
 	trailingComment string
 }
 
+// Map returns a new map[string]interface{} with the data from this instance.
+func (m *YAMLStringDataMap) Map() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	ret := make(map[string]interface{}, len(m.entries))
+	for _, e := range m.entries {
+		ret[e.Key] = e.Value
+	}
+	return ret
+}
+
 func (m *YAMLStringDataMap) rebuildEntryMap() {
 	m.entryMap = make(map[string]int, len(m.entries))
 	for i, e := range m.entries {
@@ -36,7 +52,7 @@ func (m *YAMLStringDataMap) rebuildEntryMap() {
 
 }
 
-func (m *YAMLStringDataMap) Value(key string) interface{} {
+func (m *YAMLStringDataMap) Data(key string) interface{} {
 	i, ok := m.entryMap[key]
 	if !ok {
 		return nil

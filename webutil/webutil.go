@@ -27,16 +27,19 @@ package webutil
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strings"
 )
 
 // ErrNotFound is a generic "not found" error.  Useful to communicate that generic concept
-// across packages without introducing dependencies.
-var ErrNotFound = errors.New("not found")
+// across packages without introducing dependencies.  For convenience it is an alias
+// of os.ErrNotExist, which means os.IsNotExist() will return true for it.
+var ErrNotFound = os.ErrNotExist
+
+var ErrAlreadyExists = os.ErrExist
 
 // MainOnly checks the call stack to ensure that the caller is in the main package.
 // Used to defend against inexperienced developers trying to read from a registry anywhere

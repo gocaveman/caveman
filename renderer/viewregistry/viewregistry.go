@@ -20,6 +20,7 @@ var reg webutil.NamedSequence
 
 // MustRegister adds a new FileSystem to the view registry.  Duplicates (seq, name or value) are not detected or prevented.
 func MustRegister(seq float64, name string, viewFS http.FileSystem) {
+	log.Printf("viewregistry is deprecated, use tmplregistry instead")
 	reg = append(reg, webutil.NamedSequenceItem{Sequence: seq, Name: name, Value: viewFS})
 }
 

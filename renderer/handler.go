@@ -21,7 +21,10 @@ type RenderHandler struct {
 	FileNamer FileNamer
 
 	// the renderer to use
-	Renderer Renderer
+	Renderer Renderer `autowire:""`
+
+	// loads page information before rendering, if provided
+	PageInfoReader PageInfoReader `autowire:""`
 
 	// function to test against part names
 	PartNameFunc PartNameFunc
@@ -57,7 +60,17 @@ func (h *RenderHandler) setHeaders(w http.ResponseWriter) {
 func (h *RenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	p := r.URL.Path
-	fns := h.FileNamer.FileNames(p)
+
+	// use either PageInfoReader or FileNamer to figure out what template we're serving
+	var fns []string
+	if h.PageInfoReader != nil {
+		tmplFileName, _, err := h.PageInfoReader.ReadPageInfo(p)
+		if err == nil && tmplFileName != "" {
+			fns = []string{tmplFileName}
+		}
+	} else {
+		fns = h.FileNamer.FileNames(p)
+	}
 
 	renderPartName := ""
 	if h.PartNameParam != "" {
@@ -124,4 +137,9 @@ func (h *RenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+}
+
+// PageInfoReader is a subset of pageinfo.Store, which we use to load page meta
+type PageInfoReader interface {
+	ReadPageInfo(path string) (tmplFileName string, meta map[string]interface{}, err error)
 }

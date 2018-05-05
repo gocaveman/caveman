@@ -1,16 +1,37 @@
 package renderer
 
-import "html/template"
+import (
+	"context"
+	"html/template"
+)
 
 // DEFAULT_FUNCMAP is the FuncMap used if not overridden. (See New() function.)
 // Generally, it is not recommended to change the FuncMap.  Prefer assigning
 // objects to the context as this is much less likely to cause dependency problems
 // and namespace issues.  The default FuncMap is really only here to provide easy
 // access to functionality that aides in template rendering in the most general way
-// and is common virtualy all applications.
+// and is common to virtualy all applications.
 var DEFAULT_FUNCMAP template.FuncMap = template.FuncMap{
-	"CallJSON": func(ctx interface{}) interface{} { return ctx }, // FIXME: need to figure this out...
+	// "CallJSON": func(ctx interface{}) interface{} { return ctx }, // FIXME: need to figure this out...
 	// TODO: probably HTML, CSS, JS, look around and see if anything else super common
+
+	// TODO: we definitely need something that sets one or more context keys and
+	// returns a new context
+
+	// First will return the first non-nil value you pass it.
+	"First": func(o ...interface{}) interface{} {
+		for _, ov := range o {
+			if ov != nil {
+				return ov
+			}
+		}
+		return nil
+	},
+
+	// WithValue calls and returns the result of context.WithValue(ctx, key, val).
+	"WithValue": func(ctx context.Context, key string, val interface{}) context.Context {
+		return context.WithValue(ctx, key, val)
+	},
 }
 
 // TODO: it probably makes sense to take some common functionality from the Go stdlib and

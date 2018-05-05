@@ -36,6 +36,9 @@ import (
 	"github.com/gocaveman/caveman/webutil"
 )
 
+// RendererFileName is the context key name for the file name of the top level template being rendered.
+const RendererFileName = "renderer.FileName"
+
 // some specific things to break out:
 // - path <-> filename mapping, needs to be bidirectional and pluggable
 //   filenames can be multiple options
@@ -98,8 +101,28 @@ type RendererImpl struct {
 	AfterParse  TemplateModifier
 }
 
+// NewFromTemplateReader creates a Renderer from a TemplateReader.
+func NewFromTemplateReader(tReader TemplateReader) *RendererImpl {
+
+	return &RendererImpl{
+		Loader: &GoTemplateReaderLoader{
+			TemplateReader: tReader,
+			Category:       ViewsCategory,
+		},
+		BeforeParse: NewDefaultFuncMapModifier(),
+		AfterParse: TemplateModifierList{
+			NewIncludeTemplateReaderModifier(tReader, IncludesCategory),
+			NewRequireModifier(),
+			NewPlusModifier(),
+			NewTemplateMetaModifier(tReader, ""),
+		},
+	}
+
+}
+
+// DEPRECATED: Use NewFromTemplateReader() instead.
 // New returns an Renderer implementation with the default config.
-func New(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl {
+func NewFromFSs(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl {
 	goLoader := NewGohtmlLoader(fileFS)
 	return &RendererImpl{
 		Loader: NewFileExtLoader(nil).
@@ -107,7 +130,7 @@ func New(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl {
 			WithExt(".html", goLoader),
 		BeforeParse: NewDefaultFuncMapModifier(),
 		AfterParse: TemplateModifierList{
-			NewIncludeModifier(includeFS),
+			NewIncludeFSModifier(includeFS),
 			NewRequireModifier(),
 			NewPlusModifier(),
 		},
@@ -115,10 +138,14 @@ func New(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl {
 }
 
 // Parse will load and parse the specified file, performing all before and after actions.
+// The file name you pass is associated with the context as "renderer.FileName" (RendererFileName).
 func (r *RendererImpl) Parse(ctx context.Context, filename string) (context.Context, *template.Template, error) {
 
 	var err error
 	t := template.New(filename)
+
+	// make the template file name available to the modifiers and whatever else
+	ctx = context.WithValue(ctx, RendererFileName, filename)
 
 	if r.BeforeParse != nil {
 		ctx, t, err = r.BeforeParse.TemplateModify(ctx, t)

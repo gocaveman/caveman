@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log"
 	"strings"
 )
 
@@ -16,6 +17,8 @@ type requirer interface {
 // Provides clean integration with uifiles without directly depending on it.
 func NewRequireModifier() TemplateModifier {
 	return TemplateModifierFunc(func(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
+
+		log.Printf("TODO: we should also support a require that starts with 'http://', 'https://' or '//' so you can directly specify the url, figure this out")
 
 		fs := ctx.Value("uifiles.FileSet")
 		if fs != nil {
