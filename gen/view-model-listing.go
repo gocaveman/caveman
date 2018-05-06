@@ -12,6 +12,9 @@ package gen
 
 // max record limit
 
+// ability to add the idea that you can drag and drop a sequnece for things - not core functionalityu
+// but needs to be addable if needed; possibly a separate generator
+
 // paging - think about how it integrates with search, and how permalinks work
 
 // fancy search: Here’s the idea I’m leaning toward:

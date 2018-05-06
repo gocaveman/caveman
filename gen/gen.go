@@ -35,6 +35,8 @@ import (
 
 // cavegen asset-package src/mypjt/views/assets.go - make a dir that, with go:generate, is packaged into a fs avail at runtime
 
+// cavegen embed-tmpl src/mypjt/somefiles/embed.go - use vfsgen to package a directory up into http.FileSystem and tmpl.Store and register it
+
 type Settings struct {
 	WorkDir string // directory that all of the paths are relative to
 	GOPATH  string // GOPATH as extracted from env

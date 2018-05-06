@@ -114,6 +114,11 @@ func main() {
 	// The idea is that if we stop receiving new requests and succesfully complete the old,
 	// a load balancer can reliably hold onto and retry connections that are rejected
 	// and we can get a deploy/restart (even on a single server) with no actual "down time".
+	// FIXME: we should also look at runtime.SetFinalizer and anything else relevant and
+	// see if there is some sort of "shutdown" hook that can easily be put together - without
+	// getting too weird and complicated - maybe it's just a matter of calling Close() on
+	// whatever needs it as defer in main and things get cleaned up that way (and possibly
+	// autowire needs to support some sort of Close() mechanism as well)
 	webutil.StartHTTPServer(&http.Server{
 		Addr:    viper.GetString("http-listen"),
 		Handler: hl,

@@ -20,9 +20,12 @@ import (
 // need a separate handler to loads its data - the common case of a single
 // record by ID is already handled here
 
+// update mulitple records with one PATCH/PUT call, so you can e.g. update a bunch of sequence numbers at once
+
 // i18n for validation (and other?) error messages
 
-// callback methods, with interface and New method checks to see if we implement it
+// callback methods, with interface and New method checks to see if we implement it -
+// looks like this is changing to having a ...Router and a ...Controller and a Default...Controller
 
 // handlerregistry integration
 
