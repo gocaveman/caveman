@@ -143,3 +143,12 @@ func (h *RenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type PageInfoReader interface {
 	ReadPageInfo(path string) (tmplFileName string, meta map[string]interface{}, err error)
 }
+
+// NotFoundHandler will return a handler that renders the specified page with a 404 status code.
+// By convention you usually want to pass "/_404.gohtml" as the path.
+func NotFoundHandler(rend Renderer, path404 string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		rend.ParseAndExecuteHTTP(w, r, path404)
+	})
+}
