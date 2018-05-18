@@ -646,7 +646,7 @@ type SQLTmplMigration struct {
 	DownSQL         []string
 
 	// a common reason to use SQLTmplMigration is be able to configure the table prefix
-	TablePrefix string `autowire:"db_table_prefix,optional"`
+	TablePrefix string `autowire:"db.TablePrefix,optional"`
 	// other custom data needed by the template(s) can go here
 	Data interface{}
 }

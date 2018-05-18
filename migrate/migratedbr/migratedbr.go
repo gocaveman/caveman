@@ -47,7 +47,7 @@ func (v *DbrVersioner) Categories() ([]string, error) {
 	recs := []struct {
 		Category string `db:"category"`
 	}{}
-	n, err := sess.Select("category").From(v.TableName).LoadStructs(&recs)
+	n, err := sess.Select("category").From(v.TableName).Load(&recs)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (v *DbrVersioner) Version(category string) (string, error) {
 	versionName := ""
 
 	sess := v.Connection.NewSession(nil)
-	err := sess.Select("version").From(v.TableName).Where("category = ?", category).LoadValue(&versionName)
+	err := sess.Select("version").From(v.TableName).Where("category = ?", category).LoadOne(&versionName)
 
 	// treat missing row as empty version
 	if err == dbr.ErrNotFound {
@@ -87,7 +87,7 @@ func (v *DbrVersioner) StartVersionChange(category, currentVersion string) error
 
 	versionName := ""
 
-	err := sess.Select("version").From(v.TableName).Where("category = ?", category).LoadValue(&versionName)
+	err := sess.Select("version").From(v.TableName).Where("category = ?", category).LoadOne(&versionName)
 	if err == dbr.ErrNotFound {
 
 		_, err := sess.InsertInto(v.TableName).Columns("category", "version", "status").Values(category, "", "none").Exec()
