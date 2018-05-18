@@ -18,9 +18,11 @@ func NewTable(driverName, dsn, tableName string) (*DbrVersioner, error) {
 	}
 
 	// TODO: might need to do variations on this but for now this should work for mysql, postgres and sqlite3
+	// FIXME: category changed to 128 due to some obscure MariaDB encoding issue, needs more thought
+	// https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=886756
 	_, err = conn.DB.Exec(`
 CREATE TABLE IF NOT EXISTS ` + tableName + ` (
-	category varchar(255),
+	category varchar(128),
 	version varchar(255),
 	status varchar(255),
 	PRIMARY KEY (category)
