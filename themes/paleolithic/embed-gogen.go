@@ -26,7 +26,7 @@ func main() {
 	filteredHFS := afero.NewHttpFs(filteredAFS)
 	err = vfsgen.Generate(filteredHFS, vfsgen.Options{
 		PackageName:  packageName,
-		BuildTags:    "!dev",
+		BuildTags:    "!cavemandev",
 		VariableName: "EmbeddedAssets",
 		Filename:     "embed-data.go",
 	})
@@ -34,7 +34,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	devContents := `// +build dev
+	devContents := `// +build cavemandev
 
 package __PACKAGE__
 

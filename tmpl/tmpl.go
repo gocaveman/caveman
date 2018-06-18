@@ -101,7 +101,7 @@ func ParseYAMLHeadTemplate(in io.Reader) (meta *YAMLStringDataMap, body []byte, 
 	br := bufio.NewReader(in)
 
 	line, err := br.ReadString('\n')
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, nil, err
 	}
 	// see if the first line has the YAML separator
@@ -136,9 +136,9 @@ func ParseYAMLHeadTemplate(in io.Reader) (meta *YAMLStringDataMap, body []byte, 
 		tmplPrefix.WriteString(line)
 	}
 
-	// read everything else
+	// read everything else, EOF is okay
 	rest, err := ioutil.ReadAll(br)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, nil, err
 	}
 	// put it after the prefix

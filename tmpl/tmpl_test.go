@@ -26,4 +26,14 @@ somekey2: somevalue2
 	assert.Len(meta.Keys(), 2)
 	assert.Contains(string(body), `{{template "whatever" .}}`+"\n")
 
+	in = []byte(`test2`)
+	meta, body, err = ParseYAMLHeadTemplate(bytes.NewReader(in))
+	assert.NoError(err)
+	assert.Equal(`test2`, string(body))
+
+	in = []byte(`test2` + "\n")
+	meta, body, err = ParseYAMLHeadTemplate(bytes.NewReader(in))
+	assert.NoError(err)
+	assert.Equal(`test2`+"\n", string(body))
+
 }

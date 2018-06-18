@@ -45,6 +45,10 @@ func (s *{{.StoreName}}) New{{.ModelName}}() {{if .GenericMode}}interface{}{{els
 	{{else}} return &{{.ModelName}}{}
 	{{end}} }
 
+// FIXME: We need something that allows us to pass a logger into NewSession, so we can
+// enable detailed query logging when needed.  Should be autowire-able and easy to just
+// drop in to start logging everything.
+
 // Insert{{.ModelName}} inserts the record into the database.
 func (s *{{.StoreName}}) Insert{{.ModelName}}(o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
  	// FIXME: need UUID only for non-auto-inc case, should we move gouuidv6 into caveman?  maybe gocaveman/gouuidv6
@@ -87,9 +91,13 @@ func (s *{{.StoreName}}) Get{{.ModelName}}(o *{{.ModelName}}, pk ...interface{})
 	return sess.ObjGet(o, pk...)
 }
 
-// TODO: figure out Find... methods...
+// TODO: figure out Find... methods... (think about listing page)
 
 // TODO: upsert? - maybe it's an option to add an example if desired.
+
+// TODO: relations/joins; also specifically look at having methods that say "set the
+// list of this type of joint to exactly X set as one call in one transaction", rather
+// than having to delete and re-write.
 
 `, false)
 		if err != nil {

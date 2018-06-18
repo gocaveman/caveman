@@ -72,7 +72,7 @@ func NewTemplateMetaModifier(tReader TemplateReader, category string) TemplateMo
 			if os.IsNotExist(err) { // no such template, then nop
 				return ctx, t, nil
 			}
-			// otherwise we return the rror
+			// otherwise we return the error
 			return ctx, t, err
 		}
 

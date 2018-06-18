@@ -28,6 +28,7 @@ package renderer
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -78,10 +79,10 @@ type TemplateModifierList []TemplateModifier
 
 func (l TemplateModifierList) TemplateModify(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
 	var err error
-	for _, m := range l {
+	for i, m := range l {
 		ctx, t, err = m.TemplateModify(ctx, t)
 		if err != nil {
-			return ctx, t, err
+			return ctx, t, fmt.Errorf("TemplateModifierList[%d] (%v) returned error: %v", i, m, err)
 		}
 	}
 	return ctx, t, nil
@@ -111,10 +112,11 @@ func NewFromTemplateReader(tReader TemplateReader) *RendererImpl {
 		},
 		BeforeParse: NewDefaultFuncMapModifier(),
 		AfterParse: TemplateModifierList{
+			NewTemplateMetaModifier(tReader, ""),
+			NewBlockDefineModifier(),
 			NewIncludeTemplateReaderModifier(tReader, IncludesCategory),
 			NewRequireModifier(),
 			NewPlusModifier(),
-			NewTemplateMetaModifier(tReader, ""),
 		},
 	}
 
@@ -130,6 +132,7 @@ func NewFromFSs(fileFS http.FileSystem, includeFS http.FileSystem) *RendererImpl
 			WithExt(".html", goLoader),
 		BeforeParse: NewDefaultFuncMapModifier(),
 		AfterParse: TemplateModifierList{
+			NewBlockDefineModifier(),
 			NewIncludeFSModifier(includeFS),
 			NewRequireModifier(),
 			NewPlusModifier(),
@@ -150,30 +153,35 @@ func (r *RendererImpl) Parse(ctx context.Context, filename string) (context.Cont
 	if r.BeforeParse != nil {
 		ctx, t, err = r.BeforeParse.TemplateModify(ctx, t)
 		if err != nil {
-			return ctx, t, err
+			// log.Printf("err1: %v", err)
+			return ctx, t, fmt.Errorf("BeforeParse.TemplateModify error: %v", err)
 		}
 	}
 
 	rc, err := r.Loader.Load(filename)
 	if err != nil {
+		// log.Printf("err2: %v", err)
 		return ctx, t, err
 	}
 	defer rc.Close()
 
 	b, err := ioutil.ReadAll(rc)
 	if err != nil {
+		// log.Printf("err3: %v", err)
 		return ctx, t, err
 	}
 
 	t, err = t.Parse(string(b))
 	if err != nil {
+		// log.Printf("err4: %v", err)
 		return ctx, t, err
 	}
 
 	if r.AfterParse != nil {
 		ctx, t, err = r.AfterParse.TemplateModify(ctx, t)
 		if err != nil {
-			return ctx, t, err
+			// log.Printf("err5: %v", err)
+			return ctx, t, fmt.Errorf("AfterParse.TemplateModify error: %v", err)
 		}
 	}
 
@@ -200,17 +208,21 @@ func (r *RendererImpl) ParseAndExecute(ctx context.Context, filename string, w i
 // ParseAndExecuteHTTP is similar to ParseAndExecute but works with ResponseWriter and Request.
 // If unset, it will set the content-type header to text/html and cache-control to no-store.
 // Errors are reported with webutil.HTTPError instead of being returned.
+// The context key "http.Request" is set to the value of r before calling ParseAndExecute.
 func (ri *RendererImpl) ParseAndExecuteHTTP(w http.ResponseWriter, r *http.Request, filename string) {
 
-	if w.Header().Get("content-type") == "" {
-		w.Header().Set("content-type", "text/html")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	}
 
-	if w.Header().Get("cache-control") == "" {
-		w.Header().Set("cache-control", "no-store")
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "no-store")
 	}
 
 	ctx := r.Context()
+	// ensure http.Request is set, for things that from here only have access to
+	// the context but may still need to do http-specific things
+	// ctx = context.WithValue(ctx, "http.Request", r)
 
 	err := ri.ParseAndExecute(ctx, filename, w, nil)
 	if err != nil {

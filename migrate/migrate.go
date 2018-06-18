@@ -175,10 +175,10 @@ func (r *Runner) RunTo(category, targetVersion string) error {
 	}
 
 	if curIdx < 0 {
-		return fmt.Errorf("current version %q not found in category %q", curVer)
+		return fmt.Errorf("current version %q not found in category %q", curVer, category)
 	}
 	if tgtIdx < 0 {
-		return fmt.Errorf("target version %q not found in category %q", targetVersion)
+		return fmt.Errorf("target version %q not found in category %q", targetVersion, category)
 	}
 
 	if curIdx > tgtIdx {

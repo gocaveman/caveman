@@ -9,6 +9,11 @@ import (
 	"sync"
 )
 
+// hm, this becomes circular... blarg...  maybe it belongs in handlerregistry...
+// func init() {
+// 	handlerregistry.MustRegister(handlerregistry.SeqSetup, "RequestContextHandler", NewRequestContextHandler())
+// }
+
 // StartHTTPServer is a very simple helper that starts an http.Server.
 // The WaitGroup.Add(1) and Done are called at the appropriate times
 // and logging is done.  This is just to help make projects' main.go

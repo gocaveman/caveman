@@ -16,6 +16,7 @@ package i18nyaml
 import (
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -85,7 +86,7 @@ func FileNameParse(fn string) (group, locale string, ok bool) {
 		return "", "", false
 	}
 
-	panic('need to support group-additional')
+	log.Printf("FIXME: need to support group-additional")
 	group = parts[0]
 	locale = parts[1]
 	ok = parts[2] == "yaml"

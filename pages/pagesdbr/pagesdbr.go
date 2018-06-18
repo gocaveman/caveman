@@ -1,6 +1,8 @@
 package pagesdbr
 
 import (
+	"fmt"
+
 	"github.com/gocaveman/caveman/dbutil"
 	"github.com/gocaveman/caveman/pages"
 	"github.com/gocraft/dbr"
@@ -33,27 +35,29 @@ type Index struct {
 }
 
 func NewIndex(driver, dsn string) (*Index, error) {
-	conn, err := dbr.Open(driver, dsn)
+	conn, err := dbr.Open(driver, dsn, nil)
+	if err != nil {
+		return nil, err
+	}
 	return &Index{
 		Driver:     driver,
 		DSN:        dsn,
 		Connection: conn,
 		TableName:  "page",
-	}
+	}, nil
 }
 
-func (i *Index) PageMetaByPath(path string) (pages.PageMeta, error) {
-	var pageMeta PageMeta
-	sess := i.Connection.NewSession(nil)
-	err := sess.Select("*").From(table).Where("path = ?", path).LoadStruct(&pageMeta)
-	if err == dbr.ErrNotFound {
-		err = dbutil.ErrNotFound
-	}
-	return &pageMeta, err
+func (i *Index) PageMetaByPath(path string) (ret pages.PageMeta, reterr error) {
+	// var pageMeta PageMeta
+	// sess := i.Connection.NewSession(nil)
+	// err := sess.Select("*").From("").Where("path = ?", path).LoadOne(&pageMeta)
+	// if err == dbr.ErrNotFound {
+	// 	err = dbutil.ErrNotFound
+	// }
+	// return &pageMeta, err
+	return ret, fmt.Errorf("not implemented")
 }
 
 func (i *Index) PageListByPrefix(prefix string, limit int, startAfterToken string) (result []string, token string, err error) {
-
-	//
-
+	return nil, "", fmt.Errorf("not implemented")
 }

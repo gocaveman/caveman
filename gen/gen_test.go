@@ -37,7 +37,7 @@ func TestGen(t *testing.T) {
 		GOPATH:  tmpDir,
 	}
 
-	assert.NoError(globalMapGenerator.Generate(s, "model-sample-customer", "src/demoproj/model-customer.go"))
+	assert.NoError(globalMapGenerator.Generate(s, "model-sample-todo-item", "src/demoproj/model-todo.go"))
 	assert.NoError(globalMapGenerator.Generate(s, "store", "-name", "DemoStore", "src/demoproj/store.go"))
 	bdata, err := ioutil.ReadFile(filepath.Join(s.GOPATH, "src/demoproj/store.go"))
 	assert.NoError(err)

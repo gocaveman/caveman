@@ -44,6 +44,12 @@ func (s *HFSStore) Categories() ([]string, error) {
 // ErrNotFound will be returned if it doesn't exist.
 func (s *HFSStore) ReadTemplate(category, fileName string) (body []byte, mimeType string, meta map[string]interface{}, err error) {
 
+	// defer func() {
+	// 	if err != nil {
+	// 		log.Printf("ReadTemplate(%q, %q), err: %v", category, fileName, err)
+	// 	}
+	// }()
+
 	fs := s.FileSystems[category]
 	if fs == nil {
 		return nil, "", nil, ErrNotFound

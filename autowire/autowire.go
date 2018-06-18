@@ -96,6 +96,10 @@ func Contents() *Wirer {
 // easy debug by just dropping a log statement that dumps these things
 // out... It probably makes more sense to make this stuff visible.
 
+// FIXME: do this with methods instead - it's useful to expose the data
+// and make it modifiable but probably should not expose how it stores
+// this info.
+
 // Wirer contains the Providers and Populators, usually there is one for
 // the entire application.
 type Wirer struct {

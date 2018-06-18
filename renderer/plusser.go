@@ -46,11 +46,13 @@ func NewPlusModifier() TemplateModifier {
 			pt := t.New(pname)
 
 			var buf bytes.Buffer
+			// log.Printf("pname: %q", pname)
 			fmt.Fprintf(&buf, `{{define "%s"}}`, pname)
 			for _, callName := range v {
 				if callName == pname {
 					continue // if {{block "whatever+"}}{{end}} is being done, we must make sure the template doesn't call itself
 				}
+				// log.Printf("callName: %q", callName)
 				fmt.Fprintf(&buf, `{{template "%s" .}}`, callName)
 			}
 			fmt.Fprintf(&buf, `{{end}}`)

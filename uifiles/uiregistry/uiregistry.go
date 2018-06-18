@@ -1,3 +1,4 @@
+// FIXME: crap, this should really be "uifilesregistry" to follow the convention...
 // A registry of CSS, JS files and their dependency chain.
 package uiregistry
 
@@ -30,6 +31,9 @@ func ParseName(s string) (typ, name string, err error) {
 	}
 	return parts[0], parts[1], nil
 }
+
+// FIXME: what if we use http.FileSystem and a path, instead of using webutil.DataSource?
+// It would be one less funky custom type and has effectively the same semantics.
 
 func MustRegister(name string, deps []string, ds webutil.DataSource) {
 	global.MustRegister(name, deps, ds)

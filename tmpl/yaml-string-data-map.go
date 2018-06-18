@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/gocaveman/caveman/webutil"
@@ -113,6 +114,7 @@ type YAMLMapEntry struct {
 
 // NewYAMLStringDataMap returns a newly initialized YAMLStringDataMap.
 func NewYAMLStringDataMap() *YAMLStringDataMap {
+	log.Printf("FIXME: YAML is probably a mistake, consider switching to TOML (whitespace sensitivity is a bad thing)")
 	return &YAMLStringDataMap{
 		entryMap: make(map[string]int),
 	}

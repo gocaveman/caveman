@@ -18,7 +18,7 @@ type requirer interface {
 func NewRequireModifier() TemplateModifier {
 	return TemplateModifierFunc(func(ctx context.Context, t *template.Template) (context.Context, *template.Template, error) {
 
-		log.Printf("TODO: we should also support a require that starts with 'http://', 'https://' or '//' so you can directly specify the url, figure this out")
+		log.Printf("TODO: we should also support a require that starts with 'http://', 'https://' or '//' so you can directly specify the url, figure this out; we also need something for local paths so you can just say 'require /css/mystlyes.css' and it works as expected")
 
 		fs := ctx.Value("uifiles.FileSet")
 		if fs != nil {

@@ -22,7 +22,7 @@ type Editor interface {
 	Files() ([]FileInfo, error)
 	FileInfoFor(path string) (FileInfo, error)
 	FileContentsFor(path string) (*FileContents, error)
-	WriteFileRecords(path string, []FileRecord) error
+	WriteFileRecords(path string, fileRecords []FileRecord) error
 }
 
 type FileInfo struct {

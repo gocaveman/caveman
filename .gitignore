@@ -16,3 +16,6 @@
 # mac stuff
 .DS_Store
 
+# embedded dev stuff we don't include in repo
+embed-data-dev.go
+

@@ -9,6 +9,7 @@ import (
 
 const (
 	SeqFirst      = float64(0)   // processed first
+	SeqSetup      = float64(10)  // before any middleware is run
 	SeqMiddleware = float64(20)  // middleware can modify before controllers are processed
 	SeqCtrl       = float64(50)  // controllers do the main HTTP handling
 	SeqRender     = float64(80)  // page rendering happens after other stuff is processed

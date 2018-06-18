@@ -139,7 +139,7 @@ func TestRunner(t *testing.T) {
 	assert.NoError(err)
 
 	var name string
-	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadValue(&name)
+	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadOne(&name)
 	assert.NoError(err)
 
 	assert.Equal("Key 2", name)
@@ -149,11 +149,11 @@ func TestRunner(t *testing.T) {
 	assert.NoError(err)
 
 	// make sure test2 errors now
-	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadValue(&name)
+	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadOne(&name)
 	assert.Error(err)
 
 	version := ""
-	err = sess.Select("version").From("migration_state").Where("category = ?", "example1").LoadValue(&version)
+	err = sess.Select("version").From("migration_state").Where("category = ?", "example1").LoadOne(&version)
 	assert.NoError(err)
 	assert.Equal("2017120101_test1", version)
 
@@ -163,7 +163,7 @@ func TestRunner(t *testing.T) {
 	// and make sure test2 exists now
 	_, err = sess.InsertInto("test2").Columns("id", "name").Values("k2", "Key 2").Exec()
 	assert.NoError(err)
-	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadValue(&name)
+	err = sess.Select("name").From("test2").Where("id = ?", "k2").LoadOne(&name)
 	assert.NoError(err)
 
 }

@@ -1,9 +1,12 @@
 package renderer
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/gocaveman/caveman/webutil"
 )
@@ -124,7 +127,9 @@ func (h *RenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			err := t.ExecuteTemplate(w, fn, ctx)
 			if err != nil {
-				webutil.HTTPError(w, r, err, "error during render handler (executing)", 500)
+				webutil.HTTPError(w, r,
+					fmt.Errorf("RenderHandler ExecuteTemplate on %q resulted in error: %v", fn, err),
+					"error during render handler (executing)", 500)
 				break
 			}
 
@@ -132,7 +137,9 @@ func (h *RenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if os.IsNotExist(err) || err == webutil.ErrNotFound {
 			continue
 		} else {
-			webutil.HTTPError(w, r, err, "error during render handler (parsing)", 500)
+			webutil.HTTPError(w, r,
+				fmt.Errorf("RenderHandler Parse on %q resulted in error: %v", fn, err),
+				"error during render handler (parsing)", 500)
 			break
 		}
 	}
@@ -144,10 +151,29 @@ type PageInfoReader interface {
 	ReadPageInfo(path string) (tmplFileName string, meta map[string]interface{}, err error)
 }
 
+// RendererFullPageError is the context key to use indicate if we should show a full page
+// error or an abbreviated version.  Set by NotFoundHandler().
+const RendererFullPageError = "renderer.FullPageError"
+
 // NotFoundHandler will return a handler that renders the specified page with a 404 status code.
-// By convention you usually want to pass "/_404.gohtml" as the path.
+// By convention you usually want to pass "/_404.gohtml" as the path.  If the incoming request
+// path has an extension of ".html", ".gohtml" or no extension RendererFullPageError will be set
+// in the context to true, otherwise it is set to false.
 func NotFoundHandler(rend Renderer, path404 string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+		switch strings.ToLower(path.Ext(r.URL.Path)) {
+		case "", ".html", ".gohtml":
+			ctx = context.WithValue(ctx, RendererFullPageError, true)
+		default:
+			ctx = context.WithValue(ctx, RendererFullPageError, false)
+		}
+		r = r.WithContext(ctx)
+
+		// must set content type and cache headers here because we call WriteHeader()
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(404)
 		rend.ParseAndExecuteHTTP(w, r, path404)
 	})

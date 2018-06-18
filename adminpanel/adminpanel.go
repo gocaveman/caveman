@@ -55,15 +55,18 @@ type EntryList []Entry
 
 // Top returns all top level entries (Entries where the Link has no higher prefixes).
 func (l EntryList) Top() []Entry {
-
+	panic("not implemented")
+	return nil
 }
 
 // EntryForLink returns the entry for a specific link.
 func (l EntryList) EntryForLink(link string) Entry {
-
+	panic("not implemented")
+	return nil
 }
 
 // ChildEntriesFor returns the entries which are under the specified link path (but not the Entry at this specific path).
 func (l EntryList) ChildEntriesFor(link string) []Entry {
-
+	panic("not implemented")
+	return nil
 }

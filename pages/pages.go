@@ -52,8 +52,9 @@ func (ci *CombinedIndex) AddIndex(tokenPrefix string, index Index) error {
 
 func (ci *CombinedIndex) PageMetaByPath(path string) (PageMeta, error) {
 
-	for _, idx := range ci.Indexes {
-		pm, err := idx.PageMetaByPath(path)
+	for _, idx := range ci.IndexKeys {
+		im := ci.IndexMap[idx]
+		pm, err := im.PageMetaByPath(path)
 		if err == ErrNotFound {
 			continue
 		}
@@ -91,8 +92,8 @@ func parseToken(token string) (key, item string) {
 		return parts[0], item
 	}
 
-	key = url.QueryUnescape(parts[0])
-	item = url.QueryUnescape(parts[1])
+	key, _ = url.QueryUnescape(parts[0])
+	item, _ = url.QueryUnescape(parts[1])
 
 	return
 }

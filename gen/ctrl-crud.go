@@ -21,6 +21,7 @@ import (
 // record by ID is already handled here
 
 // update mulitple records with one PATCH/PUT call, so you can e.g. update a bunch of sequence numbers at once
+// See httpapi and fill stuff to properly implement PATCH
 
 // i18n for validation (and other?) error messages
 

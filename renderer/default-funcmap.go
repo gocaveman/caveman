@@ -2,6 +2,8 @@ package renderer
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"html/template"
 )
 
@@ -32,6 +34,38 @@ var DEFAULT_FUNCMAP template.FuncMap = template.FuncMap{
 	"WithValue": func(ctx context.Context, key string, val interface{}) context.Context {
 		return context.WithValue(ctx, key, val)
 	},
+
+	// WithValueMapJSON takes a string unmarshals as JSON to map[string]interface{} and assigns
+	// each entry to the context.
+	"WithValueMapJSON": func(ctx context.Context, jsonStr string) (context.Context, error) {
+		m := make(map[interface{}]interface{}, 4)
+		err := json.Unmarshal([]byte(jsonStr), &m)
+		if err != nil {
+			return ctx, err
+		}
+		return WithValueMap(ctx, m), nil
+	},
+}
+
+func WithValueMap(ctx context.Context, values map[interface{}]interface{}) context.Context {
+	return &valueMapCtx{Context: ctx, valueMap: values}
+}
+
+type valueMapCtx struct {
+	context.Context
+	valueMap map[interface{}]interface{}
+}
+
+func (c *valueMapCtx) String() string {
+	return fmt.Sprintf("%v.WithValueMap(%#v)", c.Context, c.valueMap)
+}
+
+func (c *valueMapCtx) Value(key interface{}) interface{} {
+	v, ok := c.valueMap[key]
+	if ok {
+		return v
+	}
+	return c.Context.Value(key)
 }
 
 // TODO: it probably makes sense to take some common functionality from the Go stdlib and

@@ -1,3 +1,5 @@
+// FIXME: see https://godoc.org/golang.org/x/text/message/catalog and compare
+//
 // Translation tooling for internationalized sites/pages/components.
 //
 // Groups and Keys
