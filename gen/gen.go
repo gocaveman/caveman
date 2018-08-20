@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/jinzhu/inflection"
 	"github.com/spf13/pflag"
 )
 
@@ -274,6 +275,9 @@ func OutputGoSrcTemplate(s *Settings, data map[string]interface{}, targetFile st
 	t = t.Funcs(template.FuncMap(map[string]interface{}{
 		"bq": func(s string) string {
 			return "`" + s + "`"
+		},
+		"plural": func(s string) string {
+			return inflection.Plural(s)
 		},
 	}))
 

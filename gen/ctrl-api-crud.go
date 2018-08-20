@@ -63,7 +63,9 @@ func init() {
 		// FIXME: this breaks on JSONThing -> jSONThing
 		data["ModelNameL"] = strings.ToLower((*modelName)[:1]) + (*modelName)[1:]
 
-		data["ModelPathPart"] = strings.TrimPrefix(strings.TrimSuffix(targetFileName, ".go"), "ctrl-")
+		data["ModelPathPart"] = strings.TrimPrefix(
+			strings.TrimSuffix(strings.TrimSuffix(targetFileName, ".go"), "-api"),
+			"ctrl-")
 
 		if *storeType == "" {
 			if data["PackageName"].(string) == "main" {
@@ -131,29 +133,78 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	switch {
 
 	/**
-	 * @api {post} /api/{{.ModelPathPart}}
+	 * @api {post} /api/{{.ModelPathPart}} Create {{.ModelName}}
 	 * @apiGroup {{.ModelName}}
+	 * @apiName create-{{.ModelPathPart}}
+	 * @apiDescription Create a {{.ModelName}}
+	 *
+	 * @apiSuccessExample {json} Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     Content-Type: application/json
+	 *     Location: /api/{{.ModelPathPart}}/6cSAs4i2P3PsHq2s6PZi6V
+	 *     X-Id: 6cSAs4i2P3PsHq2s6PZi6V
+	 *
+	 *     {"result":[{
+	 *         // {{.ModelName}}
+	 *     },...]}
 	 */
 	case ar.ParseRESTObj("POST", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix):
 		err = h.Controller.Create(w, r, ar, &{{.ModelNameL}})
 
 	/**
-	 * @api {get} /api/{{.ModelPathPart}}
+	 * @api {get} /api/{{.ModelPathPart}} List {{plural .ModelName}}
 	 * @apiGroup {{.ModelName}}
+	 * @apiName list-{{.ModelPathPart}}
+	 * @apiDescription List {{plural .ModelName}}
+	 *
+	 * @apiSuccessExample {json} Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     Content-Type: application/json
+	 *
+	 *     {"result":[{
+	 *         // {{.ModelName}}
+	 *     },...]}
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix):
 		err = h.Controller.GetList(w, r, ar)
 
 	/**
-	 * @api {get} /api/{{.ModelPathPart}}/:id
+	 * @api {get} /api/{{.ModelPathPart}}/:id Get {{.ModelName}}
 	 * @apiGroup {{.ModelName}}
+	 * @apiName get-{{.ModelPathPart}}
+	 * @apiDescription Get a {{.ModelName}} with the specified ID.  Will return an error
+	 * if the object cannot be found.
+	 *
+	 * @apiParam {String} id ID of the {{.ModelName}} to return
+	 *
+	 * @apiSuccessExample {json} Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     Content-Type: application/json
+	 *
+	 *     {"result":[{
+	 *         // {{.ModelName}}
+	 *     },...]}
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
 		err = h.Controller.GetByID(w, r, ar, {{.ModelNameL}}ID)
 
 	/**
-	 * @api {patch} /api/{{.ModelPathPart}}/:id
+	 * @api {patch} /api/{{.ModelPathPart}}/:id Update {{.ModelName}}
 	 * @apiGroup {{.ModelName}}
+	 * @apiName update-{{.ModelPathPart}}
+	 * @apiDescription Update a {{.ModelName}} by ID.  Will return an error
+	 * if the object cannot be found or validation error occurs.  The updated
+	 * object will be returned.
+	 *
+	 * @apiParam {String} id ID of the {{.ModelName}} to update
+	 *
+	 * @apiSuccessExample {json} Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     Content-Type: application/json
+	 *
+	 *     {"result":[{
+	 *         // {{.ModelName}}
+	 *     },...]}
 	 */
 	case ar.ParseRESTObjPath("PUT", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID) ||
 		ar.ParseRESTObjPath("PATCH", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
@@ -161,8 +212,18 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		err = h.Controller.Update(w, r, ar, &{{.ModelNameL}})
 
 	/**
-	 * @api {delete} /api/{{.ModelPathPart}}/:id
+	 * @api {delete} /api/{{.ModelPathPart}}/:id Delete {{.ModelName}}
 	 * @apiGroup {{.ModelName}}
+	 * @apiName delete-{{.ModelPathPart}}
+	 * @apiDescription Delete a {{.ModelName}} by ID.
+	 *
+	 * @apiParam {String} id ID of the {{.ModelName}} to delete
+	 *
+	 * @apiSuccessExample {json} Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     Content-Type: application/json
+	 *
+	 *     {"result":true}
 	 */
 	case ar.ParseRESTPath("DELETE", h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
 		err = h.Controller.Delete(w, r, ar, {{.ModelNameL}}ID)
@@ -205,6 +266,10 @@ func (h *{{.ModelName}}APIController) GetList(w http.ResponseWriter, r *http.Req
 		return err
 	}
 
+	{{/* FIXME: so do we return this error or not? if we return it
+		then the caller will double-output the error, if not we just
+		hid the error - maybe we need a log statement specifically
+		for this case, think it through and drop it in */}}
 	ar.WriteResult(w, 200, {{.ModelNameL}}List)
 
 	return nil
