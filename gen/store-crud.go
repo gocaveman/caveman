@@ -51,6 +51,14 @@ func (s *{{.StoreName}}) New{{.ModelName}}() {{if .GenericMode}}interface{}{{els
 
 // Insert{{.ModelName}} inserts the record into the database.
 func (s *{{.StoreName}}) Insert{{.ModelName}}(o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
+
+	// FIXME: just change everything to use transactions, so we're in the habit of doing this
+	// and we set a good example for other more crazy methods that get added.
+
+	// FIXME: Also contexts! Think this through, but it might be smart to just pass
+	// a context to each call as an initial param and just be in that habit.
+	// The primary reason is to support cancellation.
+
  	// FIXME: need UUID only for non-auto-inc case, should we move gouuidv6 into caveman?  maybe gocaveman/gouuidv6
  	if o.{{.ModelName}}ID == "" {
  		o.{{.ModelName}}ID = gouuidv6.NewB64().String()

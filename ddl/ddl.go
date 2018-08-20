@@ -1,3 +1,13 @@
+// Easily generate common SQL DDL (data definition language) text or migrations
+// using a simple builder.  This supports common DDL operations, not everything,
+// and is an attempt to make the common operations easy to do (since the uncommon
+// operations are usually database-specific and you can still just write them out
+// by hand as SQL).  But most applications just want to create some tables and indexes
+// add a column from time to time, and maybe some foriegn keys.  This package allows
+// you to do that painlessly for SQLite3, MySQL and Postgres (others possible also
+// by implementing the appropriate interfaces).
+package ddl
+
 // Easily create database-specific Data Definition Language SQL.
 // The point of this package is to make it easy to generate DDL in a way that is
 // 1) resistant to typos and syntax errors (Go function calls are checked at
@@ -7,7 +17,6 @@
 // respectively - and while you could customize the type definition for each one, most of the
 // time you don't want to, you just conceptually want to say "give me whatever this particular
 // database uses for a boolean".)
-package ddl
 
 // concept: you create a general statement using the generic stuff - e.g. create table,
 // and it auto generates all kinds of stuff, things like setting the pks you can do
@@ -121,12 +130,148 @@ to generate our 'down' for a column type change)
 // func (g *Generator) CreateTable(name string) *Generator {
 // }
 
-type DataType interface {
-	DataTypeString()
+// type DataType interface {
+// 	DataTypeString()
+// }
+
+// type DefDataType string
+
+// type CreateTableStmt interface {
+// 	ColVarchar(name string, length int) CreateTableStmt
+// }
+
+//////////////////////
+
+// basic strategy: common operations, not everything
+
+// Builder - constructs the statements
+// Formatter - (separate ones for with and without template support) just takes
+//      statement and returns SQL (or templated SQL) statements
+//      (figure out how up/down works - if these are separate statements - probably have to be...)
+//      IDEA: if the Formatter knows it's "driver name" that could be very useful...
+//
+// something separate needs to build the migrations - must be a sane way, maybe like:
+//
+// builder := ddl.New()
+// builder.SetCategory("whatever")
+//
+// builder.WithVersion("0005_do_something").Up().CreateTable(...).
+//     Down().DropTable(...).
+//     AddMigration(ml, sqlite3Fmtter)
+//     AddMigration(ml, mysqlFmtter)
+//     AddMigration(ml, postgreFmtter)
+// or better:
+//   ...AddMigrations(ml, fmtterList)
+// and we also definitely need just a way to dump out the SQL, e.g.
+//   ...SQL(fmtter)
+
+func New() *Builder {
+	return &Builder{}
 }
 
-type DefDataType string
+type Builder struct {
+	Category string
+	Version  string
 
-type CreateTableStmt interface {
-	ColVarchar(name string, length int) CreateTableStmt
+	// FIXME: should these be single statments? and when CreateTable etc is called
+	// we check to see if it's empty?  hm, no, because a single migration can include
+	// multiple statements... (and often does);  figure out when new builders are made
+	// then - I guess when AddMigrations or ToSQL or similar is called then the statment
+	// lists get cleared
+	UpStmtList   StmtList
+	DownStmtList StmtList
+
+	down bool // set to true when new statments are down, default is up
 }
+
+func (b *Builder) pushStmt(stmt Stmt) {
+	if !b.down {
+		b.UpStmtList = append(b.UpStmtList, stmt)
+	} else {
+		b.DownStmtList = append(b.DownStmtList, stmt)
+	}
+}
+
+func (b *Builder) MakeSQL(f Formatter) (up []string, down []string, err error) {
+
+	for _, s := range b.UpStmtList {
+		sql, ferr := f.Format(s)
+		if ferr != nil {
+			err = ferr
+			return
+		}
+		up = append(up, sql)
+	}
+
+	for _, s := range b.DownStmtList {
+		sql, ferr := f.Format(s)
+		if ferr != nil {
+			err = ferr
+			return
+		}
+		down = append(down, sql)
+	}
+
+	return
+}
+
+func (b *Builder) Down() *Builder {
+	b.down = true
+	return b
+}
+
+func (b *Builder) Up() *Builder {
+	b.down = false
+	return b
+}
+
+func (b *Builder) SetCategory(category string) *Builder {
+	b.Category = category
+	return b
+}
+
+// FIXME: after migrations are created, version should probably be reset/emptied!
+// otherwise people will forget to do the verison and the migrations will be garbage;
+// and then it can err or panic if a migration is created without a version
+func (b *Builder) SetVersion(version string) *Builder {
+	b.Version = version
+	return b
+	// var ret Builder
+	// ret = *b
+	// ret.Version = version
+	// return &ret
+}
+
+func (b *Builder) CreateTable(name string) *CreateTableStmt {
+	stmt := &CreateTableStmt{
+		Builder:   b,
+		NameValue: name,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+func (b *Builder) DropTable(name string) *DropTableStmt {
+	stmt := &DropTableStmt{
+		Builder:   b,
+		NameValue: name,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+// Stmt marker interface used internally
+type Stmt interface {
+	IsStmt()
+}
+
+type StmtList []Stmt
+
+// TODO: drop table
+
+type CreateIndexStmt struct {
+}
+
+// TODO: drop index
+
+// TODO: add column
