@@ -57,7 +57,7 @@ func init() {
 		_, targetFileName := filepath.Split(targetFile)
 
 		if *modelName == "" {
-			*modelName = NameSnakeToCamel(targetFileName, []string{"ctrl-", "-api"}, nil)
+			*modelName = NameSnakeToCamel(targetFileName, []string{"ctrl-"}, []string{"-api.go", ".go"})
 		}
 		data["ModelName"] = *modelName
 		// FIXME: this breaks on JSONThing -> jSONThing
