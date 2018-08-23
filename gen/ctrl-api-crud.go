@@ -144,9 +144,9 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     Location: /api/{{.ModelPathPart}}/6cSAs4i2P3PsHq2s6PZi6V
 	 *     X-Id: 6cSAs4i2P3PsHq2s6PZi6V
 	 *
-	 *     {"result":[{
+	 *     [{
 	 *         // {{.ModelName}}
-	 *     },...]}
+	 *     }]
 	 */
 	case ar.ParseRESTObj("POST", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix):
 		err = h.Controller.Create(w, r, ar, &{{.ModelNameL}})
@@ -161,9 +161,9 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     HTTP/1.1 200 OK
 	 *     Content-Type: application/json
 	 *
-	 *     {"result":[{
+	 *     [{
 	 *         // {{.ModelName}}
-	 *     },...]}
+	 *     }]
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix):
 		err = h.Controller.GetList(w, r, ar)
@@ -181,9 +181,9 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     HTTP/1.1 200 OK
 	 *     Content-Type: application/json
 	 *
-	 *     {"result":[{
+	 *     [{
 	 *         // {{.ModelName}}
-	 *     },...]}
+	 *     }]
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
 		err = h.Controller.GetByID(w, r, ar, {{.ModelNameL}}ID)
@@ -202,9 +202,9 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     HTTP/1.1 200 OK
 	 *     Content-Type: application/json
 	 *
-	 *     {"result":[{
+	 *     [{
 	 *         // {{.ModelName}}
-	 *     },...]}
+	 *     }]
 	 */
 	case ar.ParseRESTObjPath("PUT", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID) ||
 		ar.ParseRESTObjPath("PATCH", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
