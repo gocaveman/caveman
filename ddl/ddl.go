@@ -223,6 +223,56 @@ func (b *Builder) MakeSQL(f Formatter) (up []string, down []string, err error) {
 	return
 }
 
+// MustMigrations is like Migrations but will panic on error.
+func (b *Builder) MustMigrations(formatters ...Formatter) DDLTmplMigrationList {
+	ml, err := b.Migrations(formatters...)
+	if err != nil {
+		panic(err)
+	}
+	return ml
+}
+
+// Migrations will generate and return the migrations (compatible with migrate.Migration)
+// that correspond to each of the formatters provided.
+// This call will also clear the Builder of everything except for the category,
+// so subsequent calls can start fresh on the next migration.
+func (b *Builder) Migrations(formatters ...Formatter) (ml DDLTmplMigrationList, err error) {
+
+	for _, f := range formatters {
+
+		var m DDLTmplMigration
+		m.DriverNameValue = f.DriverName()
+		m.CategoryValue = b.Category
+		m.VersionValue = b.Version
+
+		for _, s := range b.UpStmtList {
+			sql, ferr := f.Format(s)
+			if ferr != nil {
+				err = ferr
+				return
+			}
+			m.UpSQL = append(m.UpSQL, sql...)
+		}
+
+		for _, s := range b.DownStmtList {
+			sql, ferr := f.Format(s)
+			if ferr != nil {
+				err = ferr
+				return
+			}
+			m.DownSQL = append(m.DownSQL, sql...)
+		}
+
+		ml = append(ml, m)
+
+	}
+
+	// if successful, reset everything except category
+	*b = Builder{Category: b.Category}
+
+	return
+}
+
 func (b *Builder) Down() *Builder {
 	b.down = true
 	return b

@@ -6,14 +6,27 @@ import (
 	"strings"
 )
 
-// FIXME: this probably should move out to another package, and the import
-// side effect should register and cause New() to include it by default if no formatter specified
 type SQLite3Formatter struct {
-	// FIXME: option for template prefix... what should the default be?
+	Template bool // set to true to enable template output (supports prefixes)
 }
 
-func NewSQLite3Formatter() *SQLite3Formatter {
-	return &SQLite3Formatter{}
+// NewSQLite3Formatter returns a new SQLite3Formatter. If the template argument
+// is true then table prefixes (and any other templatable features)
+// will be output in Go template form, for use with migrations.  Passing false
+// will produce raw SQL that can be executed directly.
+func NewSQLite3Formatter(template bool) *SQLite3Formatter {
+	return &SQLite3Formatter{Template: template}
+}
+
+func (f *SQLite3Formatter) tmplPrefix() string {
+	if f.Template {
+		return "{{.TablePrefix}}"
+	}
+	return ""
+}
+
+func (f *SQLite3Formatter) DriverName() string {
+	return "sqlite3"
 }
 
 func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
@@ -27,7 +40,7 @@ func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
 		if st.IfNotExistsValue {
 			ifNotExistsStr = "IF NOT EXISTS "
 		}
-		fmt.Fprintf(&buf, `CREATE TABLE %s%s (`+"\n", ifNotExistsStr, sqlite3QuoteIdent(st.NameValue))
+		fmt.Fprintf(&buf, `CREATE TABLE %s%s (`+"\n", ifNotExistsStr, sqlite3QuoteIdent(f.tmplPrefix()+st.NameValue))
 
 		skipPKBlock := false
 		for _, col := range st.Columns {
@@ -59,7 +72,7 @@ func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
 		for _, fk := range st.ForeignKeys {
 			fmt.Fprintf(&buf, "    FOREIGN KEY(%s) REFERENCES %s(%s),",
 				sqlite3QuoteIdent(fk.ColumnValue),
-				sqlite3QuoteIdent(fk.OtherTableValue),
+				sqlite3QuoteIdent(f.tmplPrefix()+fk.OtherTableValue),
 				sqlite3QuoteIdent(fk.OtherColumnValue),
 			)
 		}
@@ -81,13 +94,13 @@ func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
 		return []string{fullStr}, nil
 
 	case *DropTableStmt:
-		fmt.Fprintf(&buf, `DROP TABLE %s`, sqlite3QuoteIdent(st.NameValue))
+		fmt.Fprintf(&buf, `DROP TABLE %s`, sqlite3QuoteIdent(f.tmplPrefix()+st.NameValue))
 		return []string{buf.String()}, nil
 
 	case *AlterTableRenameStmt:
 		fmt.Fprintf(&buf, `ALTER TABLE %s RENAME TO %s`,
-			sqlite3QuoteIdent(st.OldNameValue),
-			sqlite3QuoteIdent(st.NewNameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.OldNameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.NewNameValue),
 		)
 		return []string{buf.String()}, nil
 
@@ -97,7 +110,7 @@ func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
 			return nil, err
 		}
 		fmt.Fprintf(&buf, `ALTER TABLE %s ADD COLUMN %s`,
-			sqlite3QuoteIdent(st.NameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.NameValue),
 			colStr,
 		)
 		return []string{buf.String()}, nil
@@ -119,15 +132,15 @@ func (f *SQLite3Formatter) Format(stmt Stmt) ([]string, error) {
 		fmt.Fprintf(&buf, `CREATE%s INDEX%s %s ON %s(%s)`,
 			uniqueStr,
 			ifNotExistsStr,
-			sqlite3QuoteIdent(st.NameValue),
-			sqlite3QuoteIdent(st.TableNameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.NameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.TableNameValue),
 			colStr,
 		)
 		return []string{buf.String()}, nil
 
 	case *DropIndexStmt:
 		fmt.Fprintf(&buf, `DROP INDEX %s`,
-			sqlite3QuoteIdent(st.NameValue),
+			sqlite3QuoteIdent(f.tmplPrefix()+st.NameValue),
 			// NOTE: SQLite3 does not need or allow the table name
 		)
 		return []string{buf.String()}, nil

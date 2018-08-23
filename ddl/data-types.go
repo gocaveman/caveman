@@ -81,6 +81,11 @@ const (
 	Bool
 	Text
 	Blob
+	// TODO: We actually need to add a DECIMAL type - in MySQL in can be DECIMAL/NUMERIC
+	// and in SQLite3 it can be just a string.  This is vital for financial and other
+	// calculations where rounding errors and the general imprecision of floating points
+	// have big bad consequences.  It will be important to also think about what the recommended
+	// corresponding type(s) are in Go, e.g. big.Rat or something else.
 )
 
 type DataTypeDef struct {

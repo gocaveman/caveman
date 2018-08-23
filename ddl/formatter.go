@@ -7,7 +7,8 @@ import "strings"
 // also possible that functionality unavailable in a particular database
 // will need to be emulated with multiple statements.
 type Formatter interface {
-	Format(stmt Stmt) ([]string, error)
+	Format(stmt Stmt) ([]string, error) // do formatting on a statement
+	DriverName() string                 // get the driver name for this formatter, e.g. "mysql", "sqlite3"
 }
 
 type FormatterList []Formatter

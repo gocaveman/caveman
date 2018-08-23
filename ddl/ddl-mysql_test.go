@@ -2,27 +2,64 @@ package ddl
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
 	"testing"
 
+	"github.com/ory/dockertest"
 	"github.com/stretchr/testify/assert"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestSQLite3 tests each feature against a SQLite3 database to ensure syntax is correct.
-func TestSQLite3(t *testing.T) {
+func doMySQLServerSetup() (*sql.DB, *dockertest.Pool, *dockertest.Resource) {
+
+	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("Could not connect to docker: %v", err)
+	}
+
+	// pulls an image, creates a container based on it and runs it
+	resource, err := pool.Run("mysql", "5.7", []string{"MYSQL_ROOT_PASSWORD=secret"})
+	if err != nil {
+		log.Fatalf("Could not start resource: %v", err)
+	}
+
+	var db *sql.DB
+
+	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
+	if err := pool.Retry(func() error {
+		var err error
+		db, err = sql.Open("mysql", fmt.Sprintf("root:secret@(localhost:%s)/mysql", resource.GetPort("3306/tcp")))
+		if err != nil {
+			return err
+		}
+		return db.Ping()
+	}); err != nil {
+		log.Fatalf("Could not connect to docker: %v", err)
+	}
+
+	return db, pool, resource
+
+}
+
+// TestMysql tests each feature against a mysql database to ensure syntax is correct.
+func TestMysql(t *testing.T) {
 
 	assert := assert.New(t)
 
-	f := NewSQLite3Formatter(false)
+	db, pool, resource := doMySQLServerSetup()
+	defer func() {
+		if err := pool.Purge(resource); err != nil {
+			log.Printf("Could not purge resource: %v", err)
+		}
+	}()
+
+	f := NewMySQLFormatter(false)
 
 	b := New()
 	b.SetCategory("test")
-
-	db, err := sql.Open("sqlite3", `file:TestSQLite3?mode=memory&cache=shared`)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	runSQL := func(up, _ []string, err error) {
 		if err != nil {
@@ -136,11 +173,11 @@ func TestSQLite3(t *testing.T) {
 		Columns("other_cool_field").
 		MakeSQL(f))
 
-	// if not exists
-	runSQL(b.Reset().
-		CreateIndex("table_existential_other", "table_existential").
-		IfNotExists().
-		Columns("other_cool_field").
-		MakeSQL(f))
+	// // if not exists - not supported
+	// runSQL(b.Reset().
+	// 	CreateIndex("table_existential_other", "table_existential").
+	// 	IfNotExists().
+	// 	Columns("other_cool_field").
+	// 	MakeSQL(f))
 
 }
