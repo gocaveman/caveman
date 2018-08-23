@@ -1,17 +1,17 @@
 package ddl
 
 // types:
-// VarcharPK (mysql: use "ascii" for charset and "binary" for collation)
+// VarCharPK (mysql: use "ascii" for charset and "binary" for collation)
 // BigIntAutoPK
-// VarcharFK (mysql: use "ascii" for charset and "binary" for collation)
+// VarCharFK (mysql: use "ascii" for charset and "binary" for collation)
 // BigIntFK
 // Int
 // IntU
 // BigInt
 // BigIntU
 // Double
-// Datetime
-// Varchar (needs length option, sensible default) (also CaseSensitive() - sets collation on mysql, nop on others)
+// DateTime
+// VarChar (needs length option, sensible default) (also CaseSensitive() - sets collation on mysql, nop on others)
 // Bool
 // Text
 // Blob
@@ -59,23 +59,25 @@ package ddl
 // 	return *d
 // }
 
+//go:generate stringer -type=DataType -output=data-types_string.go
+
 type DataType int
 
 // enum so we can refer to data types with a simple value
 const (
 	Invalid DataType = iota
 	Custom
-	VarcharPK
+	VarCharPK
 	BigIntAutoPK
-	VarcharFK
+	VarCharFK
 	BigIntFK
 	Int
 	IntU
 	BigInt
 	BigIntU
 	Double
-	Datetime
-	Varchar
+	DateTime
+	VarChar
 	Bool
 	Text
 	Blob

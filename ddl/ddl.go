@@ -32,13 +32,13 @@ package ddl
 // Things to support:
 // CREATE TABLE
 // DROP TABLE
+// ALTER TABLE RENAME TO (rename table)
 // ALTER TABLE ADD COLUMN
+// CREATE INDEX
+// DROP INDEX
 // ALTER TABLE MODIFY COLUMN (change type)
 // ALTER TABLE DROP COLUMN
 // ALTER TABLE RENAME COLUMN
-// ALTER TABLE RENAME TO (rename table)
-// CREATE INDEX
-// DROP INDEX
 
 // NOTE: MSSQL seems to support a ALTER INDEX statement but whatever, supporting create index
 // and drop index is fine for now; and we're looking for common functionality across DBs,
@@ -184,6 +184,12 @@ type Builder struct {
 	down bool // set to true when new statments are down, default is up
 }
 
+// Reset will clear all builder fields
+func (b *Builder) Reset() *Builder {
+	*b = Builder{}
+	return b
+}
+
 func (b *Builder) pushStmt(stmt Stmt) {
 	if !b.down {
 		b.UpStmtList = append(b.UpStmtList, stmt)
@@ -192,6 +198,8 @@ func (b *Builder) pushStmt(stmt Stmt) {
 	}
 }
 
+// MakeSQL will generate and return the up and down SQL statments using
+// the formatter provided.
 func (b *Builder) MakeSQL(f Formatter) (up []string, down []string, err error) {
 
 	for _, s := range b.UpStmtList {
@@ -200,7 +208,7 @@ func (b *Builder) MakeSQL(f Formatter) (up []string, down []string, err error) {
 			err = ferr
 			return
 		}
-		up = append(up, sql)
+		up = append(up, sql...)
 	}
 
 	for _, s := range b.DownStmtList {
@@ -209,7 +217,7 @@ func (b *Builder) MakeSQL(f Formatter) (up []string, down []string, err error) {
 			err = ferr
 			return
 		}
-		down = append(down, sql)
+		down = append(down, sql...)
 	}
 
 	return
@@ -260,18 +268,50 @@ func (b *Builder) DropTable(name string) *DropTableStmt {
 	return stmt
 }
 
-// Stmt marker interface used internally
+func (b *Builder) AlterTableRename(oldName, newName string) *AlterTableRenameStmt {
+	stmt := &AlterTableRenameStmt{
+		Builder:      b,
+		OldNameValue: oldName,
+		NewNameValue: newName,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+func (b *Builder) AlterTableAdd(tableName string) *AlterTableAddStmt {
+	stmt := &AlterTableAddStmt{
+		Builder:   b,
+		NameValue: tableName,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+func (b *Builder) CreateIndex(indexName, tableName string) *CreateIndexStmt {
+	stmt := &CreateIndexStmt{
+		Builder:        b,
+		NameValue:      indexName,
+		TableNameValue: tableName,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+func (b *Builder) DropIndex(indexName, tableName string) *DropIndexStmt {
+	stmt := &DropIndexStmt{
+		Builder:        b,
+		NameValue:      indexName,
+		TableNameValue: tableName,
+	}
+	b.pushStmt(stmt)
+	return stmt
+}
+
+// Stmt marker interface used to ensure statements are of a valid type.
+// (Different statements otherwise have just completely different data
+// and no common methods.)
 type Stmt interface {
 	IsStmt()
 }
 
 type StmtList []Stmt
-
-// TODO: drop table
-
-type CreateIndexStmt struct {
-}
-
-// TODO: drop index
-
-// TODO: add column

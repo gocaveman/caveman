@@ -1,13 +1,13 @@
 package ddl
 
-import (
-	"bytes"
-	"fmt"
-)
+import "strings"
 
+// Formatter knows how to format a Stmt into one or more SQL strings.
+// Most calls to Format() will return a single SQL string, but it is
+// also possible that functionality unavailable in a particular database
+// will need to be emulated with multiple statements.
 type Formatter interface {
-	Format(stmt Stmt) (string, error)
-	// each statement type
+	Format(stmt Stmt) ([]string, error)
 }
 
 type FormatterList []Formatter
@@ -16,34 +16,10 @@ func NewFormatterList(formatters ...Formatter) FormatterList {
 	return FormatterList(formatters)
 }
 
-// FIXME: this probably should move out to another package, and the import
-// side effect should register and cause New() to include it by default if no formatter specified
-type SQLite3Formatter struct {
-	// FIXME: option for template prefix... what should the default be?
-}
-
-func NewSQLite3Formatter() *SQLite3Formatter {
-	return &SQLite3Formatter{}
-}
-
-func (f *SQLite3Formatter) Format(stmt Stmt) (string, error) {
-
-	var buf bytes.Buffer
-
-	switch st := stmt.(type) {
-	case *CreateTableStmt:
-		ifNotExistsStr := ""
-		if st.IfNotExistsValue {
-			ifNotExistsStr = "IF NOT EXISTS "
-		}
-		fmt.Fprintf(&buf, `CREATE TABLE %s%s (`+"\n", ifNotExistsStr, st.NameValue)
-		fmt.Fprintf(&buf, `  `+"\n", ifNotExistsStr, st.NameValue)
-		fmt.Fprintf(&buf, `)`)
-		return buf.String(), nil
-	case *DropTableStmt:
-		fmt.Fprintf(&buf, `DROP TABLE %s`, st.NameValue)
-		return buf.String(), nil
+func quoteIdent(s, quote string) string {
+	part := strings.SplitN(s, ".", 2)
+	if len(part) == 2 {
+		return quoteIdent(part[0], quote) + "." + quoteIdent(part[1], quote)
 	}
-
-	return "", fmt.Errorf("unknown statement type %T", stmt)
+	return quote + s + quote
 }

@@ -1,35 +1,29 @@
 package ddl
 
-import (
-	"testing"
+// func TestDDL1(t *testing.T) {
 
-	"github.com/stretchr/testify/assert"
-)
+// 	assert := assert.New(t)
 
-func TestDDL1(t *testing.T) {
+// 	// formatters := NewFormatterList(NewSQLite3Formatter())
+// 	f := NewSQLite3Formatter()
 
-	assert := assert.New(t)
+// 	b := New()
+// 	b.SetCategory("test")
 
-	// formatters := NewFormatterList(NewSQLite3Formatter())
-	f := NewSQLite3Formatter()
+// 	up, down, err := b.SetVersion("0001").
+// 		Up().
+// 		CreateTable("widget").
+// 		Column("widget_id", VarcharPK).
+// 		Column("name", Varchar).Length(255).PrimaryKey().
+// 		Down().
+// 		DropTable("widget").
+// 		MakeSQL(f)
 
-	b := New()
-	b.SetCategory("test")
+// 	assert.NoError(err)
+// 	assert.Len(up, 1)
+// 	assert.Len(down, 1)
 
-	up, down, err := b.SetVersion("0001").
-		Up().
-		CreateTable("widget").
-		Column("widget_id", VarcharPK).
-		Column("name", Varchar).Length(255).PrimaryKey().
-		Down().
-		DropTable("widget").
-		MakeSQL(f)
+// 	t.Logf("up: %v", up)
+// 	t.Logf("down: %v", down)
 
-	assert.NoError(err)
-	assert.Len(up, 1)
-	assert.Len(down, 1)
-
-	t.Logf("up: %v", up)
-	t.Logf("down: %v", down)
-
-}
+// }

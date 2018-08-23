@@ -99,9 +99,14 @@ func (def *CreateTableColDef) ForiegnKey(otherTable, otherColumn string) *Create
 }
 
 func (def *CreateTableColDef) PrimaryKey() *CreateTableColDef {
-	def.CreateTableStmt.PrimaryKeys = append(def.CreateTableStmt.PrimaryKeys, def.CreateTableStmt.NameValue)
+	def.CreateTableStmt.PrimaryKeys = append(def.CreateTableStmt.PrimaryKeys, def.DataTypeDef.NameValue)
 	return def
 }
 
-// TODO: we need to handle foreign key here, because it's not part of the data type
-// but rather part of the definition of the table
+type DropTableStmt struct {
+	*Builder
+
+	NameValue string
+}
+
+func (s *DropTableStmt) IsStmt() {}
