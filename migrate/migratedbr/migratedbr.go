@@ -43,6 +43,10 @@ type DbrVersioner struct {
 	TableName  string
 }
 
+func (v *DbrVersioner) Close() error {
+	return v.Connection.Close()
+}
+
 func (v *DbrVersioner) Categories() ([]string, error) {
 
 	sess := v.Connection.NewSession(nil)

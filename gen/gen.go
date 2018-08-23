@@ -12,10 +12,12 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 	"unicode"
 
+	"github.com/jinzhu/inflection"
 	"github.com/spf13/pflag"
 )
 
@@ -71,6 +73,11 @@ func (s *Settings) RelativeToGOPATH(p string) (string, error) {
 
 	return ret, nil
 }
+
+// // FormatGoCodeFile is like FormatGoCode but replaces a file in-place rather than operating on the bytes.
+// func (s *Settings) FormatGoCodeFile(filename string) error {
+// 	panic("not implemented yet")
+// }
 
 // FormatGoCode will try to use the goimports command to format the specified Go code.
 // If not available it will try gofmt.  You provide the logical file name and
@@ -238,6 +245,27 @@ func ParseFlagsAndOneFile(s *Settings, fset *flag.FlagSet, args []string) (targe
 	// return targetFile, data, nil
 }
 
+// GoSrcReplace performs a regexp replace on a file inline.
+// Useful for adding things to an existing file.  The filePath
+// is relative to and joined with s.GOPATH.
+func GoSrcReplace(s *Settings, filePath string, pattern *regexp.Regexp, repl func(string) string) error {
+
+	fullPath := filepath.Join(s.GOPATH, filePath)
+
+	b, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		return err
+	}
+
+	// FIXME: this should somehow error if nothing was replaced...
+	outs := pattern.ReplaceAllStringFunc(string(b), repl)
+
+	// gofmt/goimports before writing back
+	outBFmt, err := s.FormatGoCode(filePath, []byte(outs))
+
+	return ioutil.WriteFile(fullPath, outBFmt, 0644)
+}
+
 func OutputGoSrcTemplate(s *Settings, data map[string]interface{}, targetFile string, tmplSrc string, debug bool) error {
 
 	var buf bytes.Buffer
@@ -247,6 +275,9 @@ func OutputGoSrcTemplate(s *Settings, data map[string]interface{}, targetFile st
 	t = t.Funcs(template.FuncMap(map[string]interface{}{
 		"bq": func(s string) string {
 			return "`" + s + "`"
+		},
+		"plural": func(s string) string {
+			return inflection.Plural(s)
 		},
 	}))
 

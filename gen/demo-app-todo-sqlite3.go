@@ -27,11 +27,11 @@ func init() {
 		if err != nil {
 			return err
 		}
-		err = globalMapGenerator.Generate(s, "model-sample-todo-item", filepath.Join(targetDir, "model-todo-item.go"))
+		err = globalMapGenerator.Generate(s, "store", filepath.Join(targetDir, "store.go"))
 		if err != nil {
 			return err
 		}
-		err = globalMapGenerator.Generate(s, "store", filepath.Join(targetDir, "store.go"))
+		err = globalMapGenerator.Generate(s, "model-sample-todo-list", filepath.Join(targetDir, "model-todo-list.go"))
 		if err != nil {
 			return err
 		}

@@ -31,17 +31,8 @@ import (
 	"github.com/gocaveman/caveman/migrate"
 )
 
-// TODO: figure out if DefaultTableInfoMap should have "{{.StoreName}}" in it,
-// thus making it so we can put multiple stores in the same package with out conflict...
-
-// DefaultTableInfoMap is the default database config info for the various tables.
-var DefaultTableInfoMap = make(dbrobj.TableInfoMap)
-
-// DefaultNameTypes is a map that tells us which specific struct a CamelCase name corresponds to
-var DefaultNameTypes = make(map[string]reflect.Type)
-
 // Default{{.StoreName}} is the default instance that is registered with autowire.
-var Default{{.StoreName}} *{{.StoreName}} = New{{.StoreName}}(nil)
+var Default{{.StoreName}} *{{.StoreName}} = New{{.StoreName}}("sqlite3", nil)
 
 // Default{{.StoreName}}Migrations is all of our migrations for this store.
 var Default{{.StoreName}}Migrations migrate.MigrationList
@@ -50,42 +41,66 @@ func init() {
 	autowire.ProvideAndPopulate("", Default{{.StoreName}})
 }
 
-func New{{.StoreName}}(c *dbrobj.Connector) *{{.StoreName}} {
+func New{{.StoreName}}(driverName string, db *sql.DB) *{{.StoreName}} {
 	return &{{.StoreName}}{
-		Connector: c,
-		NameTypes: make(map[string]reflect.Type),
+		DriverName: driverName,
+		DB: db,
+		Meta: tmeta.NewMeta(),
 	}
 }
 
 // {{.StoreName}} provides database storage methods.
 type {{.StoreName}} struct {
-	*dbrobj.Connector {{bq "autowire:\"\""}}
+	DriverName string {{bq "autowire:\"driver_name\""}}
+	*sql.DB {{bq "autowire:\"\""}}
+	*tmeta.Meta {{bq "autowire:\"\""}}
 
-	NameTypes map[string]reflect.Type // map logical model names to actual structs
+	dbrc *dbr.Connection
+	dbrmu sync.RWMutex
+}
+
+func (s *{{.StoreName}}) dbrConn() *dbr.Connection {
+	s.dbrmu.RLock()
+	dbrc := s.dbrc
+	s.dbrmu.RUnlock()
+
+	if dbrc == nil {
+		return dbrc
+	}
+
+	s.dbrmu.Lock()
+	defer s.dbrmu.Unlock()
+
+	dbrc = &dbr.Connection{
+		DB: s.DB,
+    	EventReceiver: &dbr.NullEventReceiver{},
+	}
+	switch s.DriverName {
+	case "sqlite3":
+		dbrc.Dialect = dialect.SQLite3
+	case "mysql":
+		dbrc.Dialect = dialect.MySQL
+	case "postgres":
+		dbrc.Dialect = dialect.PostgreSQL
+	default:
+		panic("unknown driver: "+s.DriverName)
+	}
+
+	s.dbrc = dbrc
+
+	return dbrc
 }
 
 func (s *{{.StoreName}}) AfterWire() error {
 
-	// bring in default table info stuff, allowing for overrides
-	// TODO: can we make this more concise?
-
-	if s.NameTypes == nil {
-		s.NameTypes = make(map[string]reflect.Type)
-	}
-	for k, v := range DefaultNameTypes {
-		if s.NameTypes[k] == nil {
-			s.NameTypes[k] = v
-		}
+	// TODO: figure out Meta overrides (so 3p packages can override the struct used for a particular table)
+	if s.Meta == nil {
+		s.Meta = tmeta.New()
 	}
 
-	if s.TableInfoMap == nil {
-		s.TableInfoMap = make(dbrobj.TableInfoMap)
-	}
-	for k, v := range DefaultTableInfoMap {
-		if s.TableInfoMap[k] == nil {
-			s.TableInfoMap[k] = v
-		}
-	}
+	// begin meta type init
+
+	// end meta type init
 
 	return nil
 }
