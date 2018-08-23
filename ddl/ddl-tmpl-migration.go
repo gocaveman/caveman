@@ -5,17 +5,31 @@ import (
 	"database/sql"
 	"fmt"
 	"html/template"
+	"reflect"
 )
 
 type DDLTmplMigrationList []DDLTmplMigration
 
 // AppendTo is a helper to append a list of migrations to any slices whose element type
-// is compatible with DDLTmplMigrationList.  This makes it a single simple function call
+// is compatible with (*DDLTmplMigration).  This makes it a single simple function call
 // to add your DDLTmplMigrations to a migrate.MigrationList.
 // The argument must be a pointer to a slice, any incorrect type (not a pointer to
 // a slice or element type not compatible) will result in a panic.
 func (l DDLTmplMigrationList) AppendTo(slicePtr interface{}) {
+	vptr := reflect.ValueOf(slicePtr)
+	if vptr.Kind() != reflect.Ptr {
+		panic("value provided is not a pointer")
+	}
+	vd := vptr.Elem() // deref pointer
+	if vd.Kind() != reflect.Slice {
+		panic("value provided does not point to a slice")
+	}
 
+	newSliceV := vd
+	for i := range l {
+		newSliceV = reflect.Append(newSliceV, reflect.ValueOf(&l[i]))
+	}
+	vd.Set(newSliceV)
 }
 
 // DDLTmplMigration implements the migrate.Migration interface and supports templates.
