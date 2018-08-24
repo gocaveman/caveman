@@ -1,16 +1,16 @@
 package ddl
 
+// By convention, the struct members are public and end with "Value", so we
+// can use the name without any suffix as a builder method, e.g.
+// IfNotExistsValue is set with the IfNotExists() method.  We make an exception
+// for lists of things like PrimaryKeys, since the method name is PrimaryKey()
+
 type CreateTableStmt struct {
 	*Builder
 
-	// By convention, the struct members are public and end with "Value", so we
-	// can use the name without any suffix as a builder method, e.g.
-	// IfNotExistsValue is set with the IfNotExists() method.  We make an exception
-	// for lists of things like PrimaryKeys, since the method name is PrimaryKey()
-
 	NameValue string
 
-	IfNotExistsValue bool
+	IfNotExistsValue bool // TODO: consider removing this, not sure if it's really needed
 
 	Columns DataTypeDefPtrList
 
@@ -28,20 +28,6 @@ type CreateTableFKDef struct {
 type CreateTableColDef struct {
 	*CreateTableStmt
 	*DataTypeDef
-
-	// TODO: specific context and funcs so they can do Null() and Default()
-	// but then embedding *CreateTableStmt means they can also do the next
-	// column, e.g.
-	// builder.CreateTable("blah").
-	// 	ColVarchar("something").Default("empty_something").
-	//  ColVarchar("something").Null().Default(nil).
-	// ... etc.
-
-	// we do need some way to describe these columns though that is database agnostic...
-	// and store them in CreateTableStmt...  Probably a type for each column type and
-	// embed things like Nullable, Defaultable, etc. that has the field and the method(s)
-	// formatters will end up switch()ing over these types anyway so it's really just
-	// to organize the code and avoid duplication - but basically each type is just different
 }
 
 func (s *CreateTableStmt) IsStmt() {}

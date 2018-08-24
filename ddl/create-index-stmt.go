@@ -6,7 +6,7 @@ type CreateIndexStmt struct {
 	NameValue        string // index name
 	TableNameValue   string
 	UniqueValue      bool
-	IfNotExistsValue bool
+	IfNotExistsValue bool // TODO: consider removing this, not supported by MySQL and not really needed
 
 	ColumnNames []string
 }

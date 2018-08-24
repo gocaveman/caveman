@@ -88,10 +88,12 @@ func (m *DDLTmplMigration) tmplExec(dsn string, stmts []string) error {
 	return nil
 }
 
+// ExecUp will run the up migration statements.
 func (m *DDLTmplMigration) ExecUp(dsn string) error {
 	return m.tmplExec(dsn, m.UpSQL)
 }
 
+// ExecUp will run the down migration statements.
 func (m *DDLTmplMigration) ExecDown(dsn string) error {
 	return m.tmplExec(dsn, m.DownSQL)
 }

@@ -13,10 +13,6 @@ type Formatter interface {
 
 type FormatterList []Formatter
 
-func NewFormatterList(formatters ...Formatter) FormatterList {
-	return FormatterList(formatters)
-}
-
 func quoteIdent(s, quote string) string {
 	part := strings.SplitN(s, ".", 2)
 	if len(part) == 2 {

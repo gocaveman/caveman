@@ -1,64 +1,5 @@
 package ddl
 
-// types:
-// VarCharPK (mysql: use "ascii" for charset and "binary" for collation)
-// BigIntAutoPK
-// VarCharFK (mysql: use "ascii" for charset and "binary" for collation)
-// BigIntFK
-// Int
-// IntU
-// BigInt
-// BigIntU
-// Double
-// DateTime
-// VarChar (needs length option, sensible default) (also CaseSensitive() - sets collation on mysql, nop on others)
-// Bool
-// Text
-// Blob
-// variations: null, default value, foreign key
-// Custom (can just provide whatever they want)
-
-// type Namer interface {
-// 	SetName(name string)
-// }
-
-// type namer string
-
-// func (n *namer) SetName(name string) {
-// 	*n = name
-// }
-// func (n *namer) Name() string {
-// 	return string(*n)
-// }
-
-// // Nuller allows you to specify the "NULL" option on a SQL field (otherwise is NOT NULL).
-// type Nuller interface {
-// 	Null()
-// }
-
-// type nuller bool
-
-// func (n *nuller) Null() {
-// 	*n = true
-// }
-// func (n *nuller) IsNull() bool {
-// 	return *n
-// }
-
-// // Defaulter allows you to specify a default value as part of a data type.
-// type Defaulter interface {
-// 	Default(value interface{})
-// }
-
-// type defaulter interface{}
-
-// func (d *defaulter) Default(value interface{}) {
-// 	*d = value
-// }
-// func (d *defaulter) DefaultValue() interface{} {
-// 	return *d
-// }
-
 //go:generate stringer -type=DataType -output=data-types_string.go
 
 type DataType int
@@ -88,6 +29,7 @@ const (
 	// corresponding type(s) are in Go, e.g. big.Rat or something else.
 )
 
+// DataTypeDef describes a column.  It includes the name and various common options.
 type DataTypeDef struct {
 	DataTypeValue      DataType    // which basic data type
 	NameValue          string      // SQL name
