@@ -5,8 +5,8 @@ and is an attempt to make the common operations easy to do (since the uncommon
 operations are usually database-specific and you can still just write them out
 by hand as SQL).  But most applications just want to create some tables and indexes
 add a column from time to time, and maybe some foriegn keys.  This package allows
-you to do that painlessly for SQLite3, MySQL and Postgres (others possible also
-by implementing the appropriate interfaces).
+you to do that painlessly for SQLite3 and MySQL (Postgres not implemented, yet), with other outputs
+possible by implementing the Formatter interface.
 
 */
 package ddl
