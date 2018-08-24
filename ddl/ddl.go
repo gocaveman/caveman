@@ -1,11 +1,14 @@
-// Easily generate common SQL DDL (data definition language) text or migrations
-// using a simple builder.  This supports common DDL operations, not everything,
-// and is an attempt to make the common operations easy to do (since the uncommon
-// operations are usually database-specific and you can still just write them out
-// by hand as SQL).  But most applications just want to create some tables and indexes
-// add a column from time to time, and maybe some foriegn keys.  This package allows
-// you to do that painlessly for SQLite3, MySQL and Postgres (others possible also
-// by implementing the appropriate interfaces).
+/*
+Easily generate common SQL DDL (data definition language) text or migrations
+using a simple builder.  This supports common DDL operations, not everything,
+and is an attempt to make the common operations easy to do (since the uncommon
+operations are usually database-specific and you can still just write them out
+by hand as SQL).  But most applications just want to create some tables and indexes
+add a column from time to time, and maybe some foriegn keys.  This package allows
+you to do that painlessly for SQLite3, MySQL and Postgres (others possible also
+by implementing the appropriate interfaces).
+
+*/
 package ddl
 
 // Notes on things to support:
