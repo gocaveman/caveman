@@ -19,3 +19,6 @@
 # embedded dev stuff we don't include in repo
 embed-data-dev.go
 
+*-dev.go
+
+
