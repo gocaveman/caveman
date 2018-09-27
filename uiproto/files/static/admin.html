@@ -21,7 +21,7 @@
 
 
 
-  <v-navigation-drawer fixed app value="true" clipped v-model="drawer">
+    <v-navigation-drawer fixed app value="true" clipped v-model="drawer">
 
 
         <v-list>
@@ -34,211 +34,30 @@
           >
             <v-list-tile slot="activator">
               <v-list-tile-content>
-                <v-list-tile-title>${ item.title }</v-list-tile-title>
+                <v-list-tile-title>${item.title}</v-list-tile-title>
               </v-list-tile-content>
             </v-list-tile>
 
             <v-list-tile
               v-for="subItem in item.items"
               :key="subItem.title"
-              @click=""
+              @click="screen=subItem.screen"
             >
               <v-list-tile-content>
-                <v-list-tile-title>${ subItem.title }</v-list-tile-title>
+                <v-list-tile-title>${subItem.title}</v-list-tile-title>
               </v-list-tile-content>
 
               <v-list-tile-action>
-                <v-icon>${ subItem.action }</v-icon>
+                <v-icon>${subItem.action}</v-icon>
               </v-list-tile-action>
             </v-list-tile>
           </v-list-group>
         </v-list>
 
 
-<!--
-    <v-list>
-
-      <v-list-tile>
-        <v-list-tile-action>
-          <v-icon>home</v-icon>
-        </v-list-tile-action>
-        <v-list-tile-title>Home</v-list-tile-title>
-      </v-list-tile>
-
-      <v-list-group prepend-icon="account_circle" value="true">
-
-        <v-list-tile slot="activator">
-          <v-list-tile-title>Modules</v-list-tile-title>
-        </v-list-tile>
-
-        <v-list-group no-action sub-group value="true">
-          <v-list-tile>
-            <v-list-tile-title>Module 1</v-list-tile-title>
-          </v-list-tile>
-          <v-list-tile>
-            <v-list-tile-title>Module 2</v-list-tile-title>
-          </v-list-tile>
-        </v-list-group>
-
-      </v-list-group>
-
-      <v-list-group prepend-icon="account_circle" value="true">
-        <v-list-tile slot="activator">
-          <v-list-tile-title>Users</v-list-tile-title>
-        </v-list-tile>
-
-        <v-list-group no-action sub-group value="true">
-
-          <v-list-tile slot="activator">
-            <v-list-tile-title>Parent</v-list-tile-title>
-          </v-list-tile>
-
-          <v-list-tile @click="">
-            <v-list-tile-title>Child1</v-list-tile-title>
-          </v-list-tile>
-
-          <v-list-tile @click="">
-            <v-list-tile-title>Child2</v-list-tile-title>
-          </v-list-tile>
-
-        </v-list-group>
-
-        <v-list-group no-action sub-group value="true">
-
-          <v-list-tile slot="activator">
-            <v-list-tile-title>Parent2</v-list-tile-title>
-          </v-list-tile>
-
-          <v-list-tile @click="">
-            <v-list-tile-title>Child12</v-list-tile-title>
-          </v-list-tile>
-
-          <v-list-tile @click="">
-            <v-list-tile-title>Child22</v-list-tile-title>
-          </v-list-tile>
-
-        </v-list-group>
-
--->
-
-<!--
-        <v-list-group
-          sub-group
-          no-action
-        >
-          <v-list-tile slot="activator">
-            <v-list-tile-title>Actions</v-list-tile-title>
-          </v-list-tile>
-
-          <v-list-tile
-            v-for="(crud, i) in cruds"
-            :key="i"
-            @click=""
-          >
-            <v-list-tile-title v-text="crud[0]"></v-list-tile-title>
-            <v-list-tile-action>
-              <v-icon v-text="crud[1]"></v-icon>
-            </v-list-tile-action>
-          </v-list-tile>
-        </v-list-group>
--->
-
-      <!-- </v-list-group> -->
-    <!-- </v-list> -->
-
-
-  </v-navigation-drawer>
-
-
-    <!--
-    <v-navigation-drawer
-      :clipped="$vuetify.breakpoint.lgAndUp"
-      v-model="drawer"
-      fixed
-      app
-    >
-      <v-list dense>
-      -->
-
-        <!--
-        <template v-for="item in items">
-          <v-layout
-            v-if="item.heading"
-            :key="item.heading"
-            row
-            align-center
-          >
-            <v-flex xs6>
-              <v-subheader v-if="item.heading">
-                ${ item.heading }
-              </v-subheader>
-            </v-flex>
-            <v-flex xs6 class="text-xs-center">
-              <a href="#!" class="body-2 black--text">EDIT</a>
-            </v-flex>
-          </v-layout>
-          <v-list-group
-            v-else-if="item.children"
-            v-model="item.model"
-            :key="item.text"
-            :prepend-icon="item.model ? item.icon : item['icon-alt']"
-            append-icon=""
-          >
-            <v-list-tile slot="activator">
-              <v-list-tile-content>
-                <v-list-tile-title>
-                  ${ item.text }
-                </v-list-tile-title>
-              </v-list-tile-content>
-            </v-list-tile>
-            <v-list-tile
-              v-for="(child, i) in item.children"
-              :key="i"
-              @click=""
-            >
-              <v-list-tile-action v-if="child.icon">
-                <v-icon>${ child.icon }</v-icon>
-              </v-list-tile-action>
-              <v-list-tile-content>
-                <v-list-tile-title>
-                  ${ child.text }
-                </v-list-tile-title>
-              </v-list-tile-content>
-            </v-list-tile>
-          </v-list-group>
-
-          <v-list-tile v-else :key="item.text" @click="">
-            <v-list-tile-action>
-              <v-icon>${ item.icon }</v-icon>
-            </v-list-tile-action>
-            <v-list-tile-content>
-              <v-list-tile-title>
-                ${ item.text } TEXTHERE
-              </v-list-tile-title>
-            </v-list-tile-content>
-          </v-list-tile>
-
-        </template>
-        -->
-
-<!--
-          <v-list-tile @click="screen='test'">
-            <v-list-tile-action><v-icon>contacts</v-icon></v-list-tile-action>
-            <v-list-tile-content><v-list-tile-title>Modules</v-list-tile-title></v-list-tile-content>
-          </v-list-tile>
-
-          <v-list-tile @click="screen='test'">
-            <v-list-tile-action><v-icon>contacts</v-icon></v-list-tile-action>
-            <v-list-tile-content><v-list-tile-title>Pages</v-list-tile-title></v-list-tile-content>
-          </v-list-tile>
--->
-
-<!--
-      </v-list>
     </v-navigation-drawer>
--->
 
-<!-- :clipped-left="$vuetify.breakpoint.lgAndUp" -->
+
     <v-toolbar
       clipped-left
       color="blue darken-3"
@@ -246,208 +65,144 @@
       app
       fixed
     >
-      <v-toolbar-title style="width: 300px" class="ml-0 pl-3">
+      <v-toolbar-title style="width: 300px" class="ml-0">
         <v-toolbar-side-icon @click.stop="drawer = !drawer"></v-toolbar-side-icon>
         <span class="hidden-sm-and-down">Sample Site Admin</span>
       </v-toolbar-title>
 
-<!--       <v-text-field
-        flat
-        solo-inverted
-        hide-details
-        prepend-inner-icon="search"
-        label="Search"
-        class="hidden-sm-and-down"
-      ></v-text-field>
- -->      
-
-
-<!--
-      <v-spacer></v-spacer>
-      <v-btn icon>
-        <v-icon>apps</v-icon>
-      </v-btn>
-      <v-btn icon>
-        <v-icon>notifications</v-icon>
-      </v-btn>
-      <v-btn icon large>
-        <v-avatar size="32px" tile>
-          <img
-            src="https://cdn.vuetifyjs.com/images/logos/logo.svg"
-            alt="Vuetify"
-          >
-        </v-avatar>
-      </v-btn>
--->
-
     </v-toolbar>
     <v-content>
 
-
-<!--       <v-container fluid>
-    <v-layout row wrap>
-      <v-flex xs12>
-
-        <v-card>
-          <v-card-text class="px-0">
-            
-            <h1>Welcome to Caverun</h1>
-
-            <div>Get started by selecting an existing application
-            or generating a new one.</div>
-
-          </v-card-text>
-        </v-card>
-
-      </v-flex>
-    </v-layout>
-  </v-container>
- -->
-
-      <!-- <v-container fluid fill-height> -->
-      <v-container fluid>
-        <!-- <v-layout justify-center align-left> -->
+      <v-container fluid v-if="screen==''">
         <v-layout align-left>
+          <v-flex xs12 >
+            <v-card>
 
+              <v-card-title>
+                <h3 class="headline mb-0">Administration</h3>
+                <!-- <h3 >Kangaroo Valley Safari</h3> -->
+              </v-card-title>
 
+              <v-card-text>
+                Administration stuffs
+              </v-card-text>
 
-    <v-flex xs12 >
-      <v-card>
-<!--         <v-img
-          src="https://cdn.vuetifyjs.com/images/cards/desert.jpg"
-          aspect-ratio="2.75"
-        ></v-img>
- -->
-        <v-card-title>
-
-<!--           <div>
-            <h3 class="headline mb-0">Kangaroo Valley Safari</h3>
-            <div>Located two hours south of Sydney in the <br>Southern Highlands of New South Wales, ...</div>
-          </div>
- -->
-
-  <!-- <v-form > -->
-
-    <v-text-field label="Testing"></v-text-field>
-
-  <!-- </v-form> -->
-
-
-        </v-card-title>
-
-
-
-        <v-card-actions>
-          <v-btn flat color="orange">Share</v-btn>
-          <v-btn flat color="orange">Explore</v-btn>
-        </v-card-actions>
-
-      </v-card>
-    </v-flex>
-
-
-          <!-- Testing123 -->
-
-
-<!--           <v-tooltip right>
-            <v-btn
-              slot="activator"
-              :href="source"
-              icon
-              large
-              target="_blank"
-            >
-              <v-icon large>code</v-icon>
-            </v-btn>
-            <span>Source</span>
-          </v-tooltip>
-          <v-tooltip right>
-            <v-btn slot="activator" icon large href="https://codepen.io/johnjleider/pen/EQOYVV" target="_blank">
-              <v-icon large>mdi-codepen</v-icon>
-            </v-btn>
-            <span>Codepen</span>
-          </v-tooltip>
- -->
+            </v-card>
+          </v-flex>
 
         </v-layout>
       </v-container>
+
+      <v-container fluid v-if="screen=='users__settings'">
+        <v-layout align-left>
+          <v-flex xs12 >
+            <v-card>
+
+              <v-card-title>
+                <h3 class="headline mb-0">User Settings</h3>
+              </v-card-title>
+
+              <v-card-text>
+
+                  <v-form>
+                    <!-- <v-text-field label=""></v-text-field> -->
+                    <v-checkbox label="Allow public user registration"></v-checkbox>
+                    [drop down for login with user_name, email or either one]
+                    [what about options for things like password length/strength, and account lockout]
+                    <v-select :items="roles" label="Role for newly registered users"></v-select>
+                    <v-select :items="groups" label="Group for newly registered users"></v-select>
+                  </v-form>
+
+              </v-card-text>
+
+              <v-card-actions>
+                <v-btn flat color="primary">Save</v-btn>
+                <v-btn flat >Reset</v-btn>
+              </v-card-actions>
+
+            </v-card>
+          </v-flex>
+
+        </v-layout>
+      </v-container>
+
+
+      <v-container fluid v-if="screen=='users__users'">
+        <v-layout align-left>
+          <v-flex xs12 >
+            <v-card>
+
+              <v-card-title>
+                <h3 class="headline mb-0">Users</h3>
+              </v-card-title>
+
+              <v-card-text>
+
+                [drop down, search type] [search] [drop down, filters]<br/>
+                [fold out whatever custom filters, check boxes, etc.]<br/>
+                [adds a bar with chips for applied filters]
+
+                <v-data-table
+                  v-model="selected"
+                  :headers="headers"
+                  :items="user_list"
+                  :pagination.sync="pagination"
+                  select-all
+                  item-key="user_name"
+                  class="elevation-1"
+                >
+                  <template slot="headers" slot-scope="props">
+                    <tr>
+                      <th>
+                        <v-checkbox
+                          :input-value="props.all"
+                          :indeterminate="props.indeterminate"
+                          primary
+                          hide-details
+                          @click.native="toggleAll"
+                        ></v-checkbox>
+                      </th>
+                      <th
+                        v-for="header in props.headers"
+                        :key="header.text"
+                        :class="['column sortable', pagination.descending ? 'desc' : 'asc', header.value === pagination.sortBy ? 'active' : '']"
+                        @click="changeSort(header.value)"
+                      >
+                        <v-icon small>arrow_upward</v-icon>
+                        ${header.text}
+                      </th>
+                    </tr>
+                  </template>
+                  <template slot="items" slot-scope="props">
+                    <tr :active="props.selected" @click="props.selected = !props.selected">
+                      <td>
+                        <v-checkbox
+                          :input-value="props.selected"
+                          primary
+                          hide-details
+                        ></v-checkbox>
+                      </td>
+                      <td>${props.item.user_name}</td>
+                      <td class="text-xs-right">${props.item.email}</td>
+                      <td class="text-xs-right">${props.item.status}</td>
+                      <td class="text-xs-right">${props.item.roles}</td>
+                      <td class="text-xs-right">${props.item.groups}</td>
+                    </tr>
+                  </template>
+                </v-data-table>
+
+              </v-card-text>
+
+            </v-card>
+          </v-flex>
+
+        </v-layout>
+      </v-container>
+
+
+
     </v-content>
 
-<!--     <v-btn
-      fab
-      bottom
-      right
-      color="pink"
-      dark
-      fixed
-      @click="dialog = !dialog"
-    >
-      <v-icon>add</v-icon>
-    </v-btn>
- -->    
-    <v-dialog v-model="dialog" width="800px">
-      <v-card>
-        <v-card-title
-          class="grey lighten-4 py-4 title"
-        >
-          Create contact
-        </v-card-title>
-        <v-container grid-list-sm class="pa-4">
-          <v-layout row wrap>
-            <v-flex xs12 align-center justify-space-between>
-              <v-layout align-center>
-                <v-avatar size="40px" class="mr-3">
-                  <img
-                    src="//ssl.gstatic.com/s2/oz/images/sge/grey_silhouette.png"
-                    alt=""
-                  >
-                </v-avatar>
-                <v-text-field
-                  placeholder="Name"
-                ></v-text-field>
-              </v-layout>
-            </v-flex>
-            <v-flex xs6>
-              <v-text-field
-                prepend-icon="business"
-                placeholder="Company"
-              ></v-text-field>
-            </v-flex>
-            <v-flex xs6>
-              <v-text-field
-                placeholder="Job title"
-              ></v-text-field>
-            </v-flex>
-            <v-flex xs12>
-              <v-text-field
-                prepend-icon="mail"
-                placeholder="Email"
-              ></v-text-field>
-            </v-flex>
-            <v-flex xs12>
-              <v-text-field
-                type="tel"
-                prepend-icon="phone"
-                placeholder="(000) 000 - 0000"
-                mask="phone"
-              ></v-text-field>
-            </v-flex>
-            <v-flex xs12>
-              <v-text-field
-                prepend-icon="notes"
-                placeholder="Notes"
-              ></v-text-field>
-            </v-flex>
-          </v-layout>
-        </v-container>
-        <v-card-actions>
-          <v-btn flat color="primary">More</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn flat color="primary" @click="dialog = false">Cancel</v-btn>
-          <v-btn flat @click="dialog = false">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-app>
 </div>
 
@@ -466,28 +221,15 @@ let vm = new Vue({
 
       screen: '',
 
-      // menus: {
-      //   admins: [
-      //     ['Management', 'people_outline'],
-      //     ['Settings', 'settings']
-      //   ],
-      //   cruds: [
-      //     ['Create', 'add'],
-      //     ['Read', 'insert_drive_file'],
-      //     ['Update', 'update'],
-      //     ['Delete', 'delete']
-      //   ]
-      // }
-
-
       items: [
 
           {
             action: 'people',
             title: 'Users & Access',
             items: [
-              { title: 'Settings' }, // A way to configure if you can publicly create accounts, and if so what role(s) or group(s) they should posses
-              { title: 'Users' },
+              // A way to configure if you can publicly create accounts, and if so what role(s) or group(s) they should posses
+              { title: 'Settings', screen: 'users__settings' },
+              { title: 'Users', screen: 'users__users' },
               { title: 'Groups' },
               { title: 'Roles' },
               { title: 'Permissions' },
@@ -547,40 +289,121 @@ let vm = new Vue({
 
         ],
 
-      dialog: false,
+      roles: [
+        '[none]', 'Content Viewer', 'Content Editor', 'Site Admin',
+      ],
+
+      groups: [
+        '[none]', 'Public', 'Admin',
+      ],
+
       drawer: null,
-      // items: [
-      //   { icon: 'contacts', text: 'Contacts' },
-      //   { icon: 'history', text: 'Frequently contacted' },
-      //   { icon: 'content_copy', text: 'Duplicates' },
-      //   {
-      //     icon: 'keyboard_arrow_up',
-      //     'icon-alt': 'keyboard_arrow_down',
-      //     text: 'Labels',
-      //     model: true,
-      //     children: [
-      //       { icon: 'add', text: 'Create label' }
-      //     ]
-      //   },
-      //   {
-      //     icon: 'keyboard_arrow_up',
-      //     'icon-alt': 'keyboard_arrow_down',
-      //     text: 'More',
-      //     model: false,
-      //     children: [
-      //       { text: 'Import' },
-      //       { text: 'Export' },
-      //       { text: 'Print' },
-      //       { text: 'Undo changes' },
-      //       { text: 'Other contacts' }
-      //     ]
-      //   },
-      //   { icon: 'settings', text: 'Settings' },
-      //   { icon: 'chat_bubble', text: 'Send feedback' },
-      //   { icon: 'help', text: 'Help' },
-      //   { icon: 'phonelink', text: 'App downloads' },
-      //   { icon: 'keyboard', text: 'Go to the old version' }
-      // ]
+
+
+
+      pagination: {
+        sortBy: 'user_name'
+      },
+      selected: [],
+      headers: [
+        { text: 'User Name', value: 'user_name', align: 'left' },
+        { text: 'Email', value: 'email' },
+        { text: 'Status', value: 'status' },
+        { text: 'Roles', value: 'roles' },
+        { text: 'Groups', value: 'groups' },
+      ],
+      user_list: [
+        {
+          value: false,
+          user_name: 'johnjones@example.com',
+          email: 'johnjones@example.com',
+          status: 'active',
+          groups: [],
+          roles: [],
+        },
+        // {
+        //   value: false,
+        //   name: 'Ice cream sandwich',
+        //   calories: 237,
+        //   fat: 9.0,
+        //   carbs: 37,
+        //   protein: 4.3,
+        //   iron: '1%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Eclair',
+        //   calories: 262,
+        //   fat: 16.0,
+        //   carbs: 23,
+        //   protein: 6.0,
+        //   iron: '7%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Cupcake',
+        //   calories: 305,
+        //   fat: 3.7,
+        //   carbs: 67,
+        //   protein: 4.3,
+        //   iron: '8%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Gingerbread',
+        //   calories: 356,
+        //   fat: 16.0,
+        //   carbs: 49,
+        //   protein: 3.9,
+        //   iron: '16%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Jelly bean',
+        //   calories: 375,
+        //   fat: 0.0,
+        //   carbs: 94,
+        //   protein: 0.0,
+        //   iron: '0%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Lollipop',
+        //   calories: 392,
+        //   fat: 0.2,
+        //   carbs: 98,
+        //   protein: 0,
+        //   iron: '2%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Honeycomb',
+        //   calories: 408,
+        //   fat: 3.2,
+        //   carbs: 87,
+        //   protein: 6.5,
+        //   iron: '45%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'Donut',
+        //   calories: 452,
+        //   fat: 25.0,
+        //   carbs: 51,
+        //   protein: 4.9,
+        //   iron: '22%'
+        // },
+        // {
+        //   value: false,
+        //   name: 'KitKat',
+        //   calories: 518,
+        //   fat: 26.0,
+        //   carbs: 65,
+        //   protein: 7,
+        //   iron: '6%'
+        // }
+      ],
+
 
 
     }),
