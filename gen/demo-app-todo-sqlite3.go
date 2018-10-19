@@ -39,7 +39,7 @@ func init() {
 		if err != nil {
 			return err
 		}
-		err = globalMapGenerator.Generate(s, "ctrl-crud", filepath.Join(targetDir, "ctrl-todo-item.go"))
+		err = globalMapGenerator.Generate(s, "ctrl-api-crud", filepath.Join(targetDir, "ctrl-todo-item.go"))
 		if err != nil {
 			return err
 		}

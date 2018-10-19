@@ -10,17 +10,15 @@ import (
 )
 
 func init() {
-	globalMapGenerator["model-sample-todo-list"] = GeneratorFunc(func(s *Settings, name string, args ...string) error {
+	globalMapGenerator["model-todo-list"] = GeneratorFunc(func(s *Settings, name string, args ...string) error {
 
 		fset := pflag.NewFlagSet("gen", pflag.ContinueOnError)
-		noItem := fset.Bool("no-item", false, "Do not output the todo-item, only todo-list")
+		withItem := fset.Bool("with-item", false, "Output the todo-item in addition to todo-list")
+		noTypes := fset.Bool("no-types", false, "Do not attempt to add types to store.go")
 		targetFile, data, err := ParsePFlagsAndOneFile(s, fset, args)
 		if err != nil {
 			return err
 		}
-
-		// `// end meta type`
-		// TODO: text replacement on .../store.go
 
 		targetListFile := targetFile
 		targetItemFile := strings.Replace(targetFile, ".go", "-item.go", 1)
@@ -31,6 +29,8 @@ func init() {
 			targetItemFile = strings.Replace(targetListFile, "-list.go", "-item.go", 1)
 		}
 
+		data["WithItem"] = *withItem
+
 		listData := make(map[string]interface{}, len(data)+10)
 		for k, v := range data {
 			listData[k] = v
@@ -40,18 +40,24 @@ func init() {
 			itemData[k] = v
 		}
 
-		// modify store.go to register the type
-		storeFile := filepath.Join(filepath.Base(targetFile), "store.go")
-		storeMetaStr := "\n"
-		storeMetaStr += `if err := s.Meta.Parse(TodoList{}); err != nil { return err }` + "\n"
-		if !*noItem {
-			storeMetaStr += `if err := s.Meta.Parse(TodoItem{}); err != nil { return err }` + "\n"
-		}
-		err = GoSrcReplace(s, storeFile, regexp.MustCompile(`// end meta type init`), func(s string) string {
-			return storeMetaStr + "\n\n" + s
-		})
-		if err != nil {
-			return err
+		if !*noTypes {
+			// TODO: name of store file should be able to be specified, and possibly some more intelligent guessing could be done;
+			// actually, a function that scans a package and figures out what the store file name and struct name is would be really useful
+			// for several cases here.
+			// modify store.go to register the type
+			storeFile := filepath.Join(filepath.Dir(targetFile), "store.go")
+			// parse if not already registered - TODO: a function should be added to tmeta for this
+			storeMetaStr := "\n"
+			storeMetaStr += `if s.Meta.For(TodoList{}) == nil { if err := s.Meta.Parse(TodoList{}); err != nil { return err } }` + "\n"
+			if *withItem {
+				storeMetaStr += `if s.Meta.For(TodoItem{}) == nil { if err := s.Meta.Parse(TodoItem{}); err != nil { return err } }` + "\n"
+			}
+			err = GoSrcReplace(s, storeFile, regexp.MustCompile(`// end meta type init`), func(s string) string {
+				return storeMetaStr + "\n\n" + s
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		// FIXME:
@@ -73,20 +79,56 @@ func init() {
 		// TEXT in sqlite, etc., etc.  And if you need other weird shit, you can always write
 		// it by hand.  This would actually be the most useful thing...
 
-		listData["CreateStatement"] = `CREATE TABLE {{.TablePrefix}}todo_list (
-				todo_list_id VARCHAR(64),
-				name VARCHAR(255),
-				description TEXT,
-				version BIGINT,
-				create_time TEXT,
-				update_time TEXT,
-				PRIMARY KEY (todo_list_id)
-			)`
-		listData["DropStatement"] = `DROP TABLE {{.TablePrefix}}todo_list`
+		// listData["CreateStatement"] = `CREATE TABLE {{.TablePrefix}}todo_list (
+		// 		todo_list_id VARCHAR(64),
+		// 		name VARCHAR(255),
+		// 		description TEXT,
+		// 		version BIGINT,
+		// 		create_time TEXT,
+		// 		update_time TEXT,
+		// 		PRIMARY KEY (todo_list_id)
+		// 	)`
+		// listData["DropStatement"] = `DROP TABLE {{.TablePrefix}}todo_list`
 
 		err = OutputGoSrcTemplate(s, listData, targetListFile, `
 package {{.PackageName}}
 
+import (
+	"github.com/bradleypeabody/gouuidv6"
+	"github.com/gocaveman/caveman/migrate"
+	"github.com/gocaveman/caveman/ddl"
+)
+
+func TodoListMigrations() (ml migrate.MigrationList) {
+
+	fl := ddl.FormatterList{ddl.NewSQLite3Formatter(true), ddl.NewMySQLFormatter(true)}
+
+	b := ddl.New()
+	b.SetCategory("0100_{{.PackageName}}")
+
+	b.SetVersion("0100_Acreate_todo_item")
+	b.Up().
+		CreateTable("todo_list").
+		Column("todo_list_id", ddl.VarCharPK).PrimaryKey().
+		Column("name", ddl.VarChar).
+		Column("description", ddl.Text).
+		Column("version", ddl.BigInt).
+		Column("create_time", ddl.DateTime).
+		Column("update_time", ddl.DateTime).
+		Down().
+		DropTable("todo_list")
+	b.Up().
+		CreateIndex("todo_list_name", "todo_list").Columns("name").
+		Down().
+		DropIndex("todo_list_name", "todo_list")
+	b.MustMigrations(fl...).AppendTo(&ml)
+
+	// more migrations can go here, using the pattern of SetVersion(), statement(s), MustMigrations()...AppendTo()
+
+	return
+}
+
+{{/*
 func init() {
 	if DefaultNameTypes["TodoItem"] == nil {
 		DefaultNameTypes["TodoItem"] = reflect.TypeOf(TodoItem{})
@@ -120,38 +162,78 @@ func init() {
 	// more calls like: reg(&SQLTmplMigration{...})
 
 }
+*/}}
 
 type TodoList struct {
-	TodoListID string {{bq "db:\"todo_item_id\" json:\"todo_item_id\""}}
-	Name string {{bq "db:\"category\" json:\"category\""}} 
+	TodoListID string {{bq "tmeta:\"pk\" db:\"todo_item_id\" json:\"todo_item_id\""}}
+	Name string {{bq "db:\"category\" json:\"category\" valid:\"minlen=1\""}} 
 	Description string {{bq "db:\"description\" json:\"description\""}}
-	Version int64 {{bq "db:\"version\" json:\"version\" tmeta:\"version\""}}
+	Version int64 {{bq "tmeta:\"version\" db:\"version\" json:\"version\""}}
 	CreateTime tmetautil.DBTime {{bq "db:\"create_time\" json:\"create_time\""}}
 	UpdateTime tmetautil.DBTime {{bq "db:\"update_time\" json:\"update_time\""}}
+
+	{{if .WithItem}}
+	// relation(s)
+	TodoItemList []TodoItem {{bq "tmeta:\"has_many\" db:\"-\" json:\"todo_item_list\""}}
+	{{end}}
 }
 
 func (o *TodoList) CreateTimeTouch() { o.CreateTime = tmetautil.NewDBTime() }
 func (o *TodoList) UpdateTimeTouch() { o.UpdateTime = tmetautil.NewDBTime() }
+func (o *TodoList) IDAssign() { if o.TodoListID == "" { o.TodoListID = gouuidv6.NewB64().String() } }
 
 `, false)
 		if err != nil {
 			return err
 		}
 
-		if *noItem {
-			itemData["CreateStatement"] = `CREATE TABLE {{.TablePrefix}}todo_item (
-				todo_item_id VARCHAR(64),
-				todo_list_id VARCHAR(64),
-				category VARCHAR(255),
-				title VARCHAR(255),
-				description TEXT,
-				PRIMARY KEY (todo_item_id)
-			)`
-			itemData["DropStatement"] = `DROP TABLE {{.TablePrefix}}todo_item`
+		if *withItem {
+			// itemData["CreateStatement"] = `CREATE TABLE {{.TablePrefix}}todo_item (
+			// 	todo_item_id VARCHAR(64),
+			// 	todo_list_id VARCHAR(64),
+			// 	category VARCHAR(255),
+			// 	title VARCHAR(255),
+			// 	description TEXT,
+			// 	PRIMARY KEY (todo_item_id)
+			// )`
+			// itemData["DropStatement"] = `DROP TABLE {{.TablePrefix}}todo_item`
 
 			err = OutputGoSrcTemplate(s, itemData, targetItemFile, `
 package {{.PackageName}}
 
+import (
+	"github.com/bradleypeabody/gouuidv6"
+	"github.com/gocaveman/caveman/migrate"
+	"github.com/gocaveman/caveman/ddl"
+)
+
+func TodoItemMigrations() (ml migrate.MigrationList) {
+
+	fl := ddl.FormatterList{ddl.NewSQLite3Formatter(true), ddl.NewMySQLFormatter(true)}
+
+	b := ddl.New()
+	b.SetCategory("0100_{{.PackageName}}")
+
+	b.SetVersion("0100_Bcreate_todo_item")
+	b.Up().
+		CreateTable("todo_item").
+		Column("todo_item_id", ddl.VarCharPK).PrimaryKey().
+		Column("todo_list_id", ddl.VarCharFK).ForiegnKey("todo_list", "todo_list_id").
+		Column("line", ddl.Text).
+		Column("sequence", ddl.Double).
+		Column("version", ddl.BigInt).
+		Column("create_time", ddl.DateTime).
+		Column("update_time", ddl.DateTime).
+		Down().
+		DropTable("todo_item")
+	b.MustMigrations(fl...).AppendTo(ml)
+
+	// more migrations can go here, using the pattern of SetVersion(), statement(s), MustMigrations()...AppendTo()
+
+	return
+}
+
+{{/*
 func init() {
 	if DefaultNameTypes["TodoItem"] == nil {
 		DefaultNameTypes["TodoItem"] = reflect.TypeOf(TodoItem{})
@@ -185,21 +267,26 @@ func init() {
 	// more calls like: reg(&SQLTmplMigration{...})
 
 }
-
-// FIXME: timestamp columns (get the types and setup right both in
-// the Go struct and the DDL)
+*/}}
 
 type TodoItem struct {
-	TodoItemID string {{bq "db:\"todo_item_id\" json:\"todo_item_id\""}}
-	Category string {{bq "db:\"category\" json:\"category\""}} 
-	Title string {{bq "db:\"title\" json:\"title\" valid:\"minlen=1\""}}
-	Description string {{bq "db:\"description\" json:\"description\""}}
+	TodoItemID string {{bq "tmeta:\"pk\" db:\"todo_item_id\" json:\"todo_item_id\""}}
+	TodoListID string {{bq "db:\"todo_list_id\" json:\"todo_list_id\""}}
+	Line string {{bq "db:\"line\" json:\"line\" valid:\"minlen=1\""}} 
+	Sequence float64 {{bq "db:\"sequence\" json:\"sequence\""}}
 
-	// FIXME: create and update timestamps and touch methods from tmetadbr
-	// FIXME: version column
-	// FIXME: probably a "todo_list" and "todo_list_item" or similar would be smart,
-	// in order to show basic relation operation
+	Version int64 {{bq "tmeta:\"version\" db:\"version\" json:\"version\""}}
+	CreateTime tmetautil.DBTime {{bq "db:\"create_time\" json:\"create_time\""}}
+	UpdateTime tmetautil.DBTime {{bq "db:\"update_time\" json:\"update_time\""}}
+
+	// relation(s)
+	TodoList *TodoList {{bq "tmeta:\"belongs_to\" db:\"-\" json:\"todo_list\""}}
 }
+
+func (o *TodoItem) CreateTimeTouch() { o.CreateTime = tmetautil.NewDBTime() }
+func (o *TodoItem) UpdateTimeTouch() { o.UpdateTime = tmetautil.NewDBTime() }
+func (o *TodoItem) IDAssign() { if o.TodoItemID == "" { o.TodoItemID = gouuidv6.NewB64().String() } }
+
 `, false)
 		}
 		if err != nil {

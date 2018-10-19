@@ -29,8 +29,10 @@ package {{.PackageName}}
 
 import (
 	"github.com/gocaveman/caveman/migrate"
+	"github.com/gocaveman/tmeta"
 )
 
+{{/*
 // Default{{.StoreName}} is the default instance that is registered with autowire.
 var Default{{.StoreName}} *{{.StoreName}} = New{{.StoreName}}("sqlite3", nil)
 
@@ -48,17 +50,18 @@ func New{{.StoreName}}(driverName string, db *sql.DB) *{{.StoreName}} {
 		Meta: tmeta.NewMeta(),
 	}
 }
+*/}}
 
 // {{.StoreName}} provides database storage methods.
 type {{.StoreName}} struct {
 	DriverName string {{bq "autowire:\"driver_name\""}}
 	*sql.DB {{bq "autowire:\"\""}}
 	*tmeta.Meta {{bq "autowire:\"\""}}
-
 	dbrc *dbr.Connection
-	dbrmu sync.RWMutex
+	EventReceiver dbr.EventReceiver {{bq "autowire:\"\""}} // if non-nil will be used to log the SQL that gets executed
 }
 
+{{/*
 func (s *{{.StoreName}}) dbrConn() *dbr.Connection {
 	s.dbrmu.RLock()
 	dbrc := s.dbrc
@@ -90,17 +93,33 @@ func (s *{{.StoreName}}) dbrConn() *dbr.Connection {
 
 	return dbrc
 }
+*/}}
 
+// AfterWire is called by autowire or invoked manually and is needed to complete store setup before use.
 func (s *{{.StoreName}}) AfterWire() error {
 
-	// TODO: figure out Meta overrides (so 3p packages can override the struct used for a particular table)
 	if s.Meta == nil {
-		s.Meta = tmeta.New()
+		return fmt.Errorf("Meta is nil, please provide one")
 	}
 
 	// begin meta type init
 
 	// end meta type init
+
+	s.dbrc = &dbr.Connection{
+		DB: s.DB,
+    	EventReceiver: &dbr.NullEventReceiver{},
+	}
+	switch s.DriverName {
+	case "sqlite3":
+		s.dbrc.Dialect = dialect.SQLite3
+	case "mysql":
+		s.dbrc.Dialect = dialect.MySQL
+	case "postgres":
+		s.dbrc.Dialect = dialect.PostgreSQL
+	default:
+		return fmt.Errorf("unknown driver: %q", s.DriverName)
+	}
 
 	return nil
 }

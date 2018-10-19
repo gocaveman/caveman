@@ -44,20 +44,35 @@ type Settings struct {
 	GOPATH  string // GOPATH as extracted from env
 }
 
-// RelativeToGOPATH returns "src/whatever" from "whatever" given
+// RelativeToGOPATH returns "src/whatever" from "./whatever" given
 // that WorkDir is GOPATH+"/src".  Basically, it takes a file name
 // as provided by the user and gives you something relative to GOPATH.
 // Returns error if p is not in GOPATH.  You should use this to convert
 // user-provided file names into something you can reliably work with.
-func (s *Settings) RelativeToGOPATH(p string) (string, error) {
+// Absolute paths are made relative and checked to ensure they are under
+// GOPATH or will return error.
+// If the path starts with a "./" or "../" it is interpreted as relative to the
+// current working directory.
+// Otherwise it is assumed to already be relative to GOPATH.
+func (s *Settings) RelativeToGOPATH(p string) (retv string, rete error) {
+
+	// origp := p
+	// defer func() {
+	// 	log.Printf("RelativeToGOPATH %q is returning (%q, %v)", origp, retv, rete)
+	// }()
 
 	if !filepath.IsAbs(s.GOPATH) {
 		return "", fmt.Errorf("GOPATH %q is not an absolute path, cannont continue", s.GOPATH)
 	}
 
-	// if p is not already absolute, use WorkDir to make an absolute path.
-	if !filepath.IsAbs(p) {
+	// it should be interpreted as relative, use WorkDir to make an absolute path.
+	if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") {
 		p = filepath.Join(s.WorkDir, p)
+	}
+
+	// if it's still not absolute, use GOPATH to make it so
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(s.GOPATH, p)
 	}
 
 	ret, err := filepath.Rel(s.GOPATH, p)

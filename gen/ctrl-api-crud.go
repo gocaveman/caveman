@@ -90,10 +90,27 @@ import (
 
 const (
 	{{.ModelName}}CreatePerm = "{{.ModelName}}.Create"
-	{{.ModelName}}GetByIDPerm = "{{.ModelName}}.GetByID"
-	{{.ModelName}}UpdatePerm   = "{{.ModelName}}.Update"
+	{{.ModelName}}FetchPerm = "{{.ModelName}}.Fetch"
+	{{.ModelName}}SearchPerm = "{{.ModelName}}.Search"
+	{{.ModelName}}UpdatePerm = "{{.ModelName}}.Update"
 	{{.ModelName}}DeletePerm = "{{.ModelName}}.Delete"
+
+	{{/* TODO: figure out if we should provide some variations as options
+	{{.ModelName}}CreateAnyPerm = "{{.ModelName}}.CreateAny"
+	{{.ModelName}}FetchAnyPerm = "{{.ModelName}}.FetchAny"
+	{{.ModelName}}SearchAnyPerm = "{{.ModelName}}.SearchAny"
+	{{.ModelName}}UpdateAnyPerm = "{{.ModelName}}.UpdateAny"
+	{{.ModelName}}DeleteAnyPerm = "{{.ModelName}}.DeleteAny"
+	*/}}
 )
+
+func init() {
+	permregistry.MustAddPerm("admin", {{.ModelName}}CreatePerm)
+	permregistry.MustAddPerm("admin", {{.ModelName}}FetchPerm)
+	permregistry.MustAddPerm("admin", {{.ModelName}}SearchPerm)
+	permregistry.MustAddPerm("admin", {{.ModelName}}UpdatePerm)
+	permregistry.MustAddPerm("admin", {{.ModelName}}DeletePerm)
+}
 
 type {{.ModelName}}APIRouter struct {
 	APIPrefix string {{bq "autowire:\"api_prefix,optional\""}} // default: "/api" {{/* TODO: naming convention? */}}
@@ -103,7 +120,9 @@ type {{.ModelName}}APIRouter struct {
 	{{/*
 	TODO: Renderer and path for data loading on detail page.
 	Hm, need to figure out if the data loading for detail page,
-	etc should be done here or in a different handler.
+	etc should be done here or in a different handler.  Or do we
+	just assume people won't need to do this... not sure, different
+	schools of thought on that
 	*/}}
 }
 
@@ -121,13 +140,28 @@ func (h *{{.ModelName}}APIRouter) AfterWire() error {
 	return nil
 }
 
+// search{{.ModelName}}Params is the criteria for a search,
+// corresponding to URL parameters
+type search{{.ModelName}}Params struct {
+	Criteria tmetautil.Criteria {{bq "json:\"criteria\""}}
+	OrderBy tmetautil.OrderByList {{bq "json:\"order_by\""}}
+	Limit int64 {{bq "json:\"limit\""}}
+	Offset int64 {{bq "json:\"offset\""}}
+	Related []string {{bq "json:\"related\""}}
+	ReturnCount bool {{bq "json:\"return_count\""}}
+}
+
 func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var {{.ModelNameL}} {{.ModelTypeName}}
 	var {{.ModelNameL}}ID string
+	var mapData map[string]interface{}
 
 	ar := httpapi.NewRequest(r)
 
+	searchParams := search{{.ModelName}}Params {
+		Limit: 100,
+	}
 	var err error
 
 	switch {
@@ -152,9 +186,9 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		err = h.Controller.Create(w, r, ar, &{{.ModelNameL}})
 
 	/**
-	 * @api {get} /api/{{.ModelPathPart}} List {{plural .ModelName}}
+	 * @api {get} /api/{{.ModelPathPart}} Search {{plural .ModelName}}
 	 * @apiGroup {{.ModelName}}
-	 * @apiName list-{{.ModelPathPart}}
+	 * @apiName search-{{.ModelPathPart}}
 	 * @apiDescription List {{plural .ModelName}}
 	 *
 	 * @apiSuccessExample {json} Success-Response:
@@ -166,12 +200,16 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     }]
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix):
-		err = h.Controller.GetList(w, r, ar)
+		err = httpapi.FormUnmarshal(r.URL.Query(), &searchParams)
+		if err != nil {
+			break
+		}
+		err = h.Controller.Search(w, r, ar, searchParams)
 
 	/**
-	 * @api {get} /api/{{.ModelPathPart}}/:id Get {{.ModelName}}
+	 * @api {get} /api/{{.ModelPathPart}}/:id Fetch {{.ModelName}}
 	 * @apiGroup {{.ModelName}}
-	 * @apiName get-{{.ModelPathPart}}
+	 * @apiName fetch-{{.ModelPathPart}}
 	 * @apiDescription Get a {{.ModelName}} with the specified ID.  Will return an error
 	 * if the object cannot be found.
 	 *
@@ -186,7 +224,11 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *     }]
 	 */
 	case ar.ParseRESTPath("GET", h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
-		err = h.Controller.GetByID(w, r, ar, {{.ModelNameL}}ID)
+		err = httpapi.FormUnmarshal(r.URL.Query(), &searchParams)
+		if err != nil {
+			break
+		}
+		err = h.Controller.Fetch(w, r, ar, {{.ModelNameL}}ID, searchParams.Related...)
 
 	/**
 	 * @api {patch} /api/{{.ModelPathPart}}/:id Update {{.ModelName}}
@@ -206,10 +248,10 @@ func (h *{{.ModelName}}APIRouter) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	 *         // {{.ModelName}}
 	 *     }]
 	 */
-	case ar.ParseRESTObjPath("PUT", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID) ||
-		ar.ParseRESTObjPath("PATCH", &{{.ModelNameL}}, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
+	case ar.ParseRESTObjPath("PUT", &mapData, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID) ||
+		ar.ParseRESTObjPath("PATCH", &mapData, h.APIPrefix+h.ModelPrefix+"/%s", &{{.ModelNameL}}ID):
 		{{.ModelNameL}}.{{.ModelName}}ID = {{.ModelNameL}}ID
-		err = h.Controller.Update(w, r, ar, &{{.ModelNameL}})
+		err = h.Controller.Update(w, r, ar, {{.ModelNameL}}ID, mapData)
 
 	/**
 	 * @api {delete} /api/{{.ModelPathPart}}/:id Delete {{.ModelName}}
@@ -243,7 +285,10 @@ func (h *{{.ModelName}}APIController) Create(w http.ResponseWriter, r *http.Requ
 		return &httpapi.ErrorDetail{Code: 403, Message: "access denied"}
 	}
 
-	err = h.Store.Create{{.ModelName}}({{.ModelNameL}})
+	// FIXME: we should probably be using httpapi.Fill() here to ensure
+	// consistent behavior with Update()
+
+	err := h.Store.Create{{.ModelName}}(r.Context(), {{.ModelNameL}})
 	if err != nil {
 		return err
 	}
@@ -255,50 +300,153 @@ func (h *{{.ModelName}}APIController) Create(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (h *{{.ModelName}}APIController) GetList(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest) error {
+// TODO: we need our fancy find, it should have:
+// * List of relations to return
+// * Make sure to set the deadline, and a default and a max limit on the records, offset for paging
+// * Where conditions expressed as nested struct (probably something that should go in dbutil pkg).
+//   There can also be something on that where struct that allows the Store to easily say
+//   "I need an exact match (optionally or LIKE prefix% with at least N chars) on
+//   at least one of these fields", to enforce that an index is being
+//   used (if desired - which it should be by default).
+// * What about rate limiting for security purposes, and API usage? (related but not necessarily the same)
 
-	if !userctrl.ReqUserHasPerm(r, {{.ModelName}}GetListPerm) {
+func (h *{{.ModelName}}APIController) Search(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest, params search{{.ModelName}}Params) error {
+
+	if !userctrl.ReqUserHasPerm(r, {{.ModelName}}SearchPerm) {
 		return &httpapi.ErrorDetail{Code: 403, Message: "access denied"}
 	}
 
-	{{.ModelNameL}}List, err := h.Store.Find{{.ModelName}}List()
+	// make a separate context with timeout so search doesn't run too long
+	queryCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	maxLimit := int64(5000) // never allow more than this many records
+	if params.Limit + params.Offset > maxLimit {
+		return fmt.Errorf("limit plus offset exceeded maximum value")
+	}
+
+	// check all of the field and relation names to prevent SQL injection or other unexpected behavior
+    err := params.Criteria.CheckFieldNames(h.Store.Meta.For({{.ModelTypeName}}{}).SQLFields(true)...)
+    if err != nil {
+        return err
+    }
+    err = params.OrderBy.CheckFieldNames(h.Store.Meta.For({{.ModelTypeName}}{}).SQLFields(true)...)
+    if err != nil {
+        return err
+    }
+    err = h.Store.Meta.For({{.ModelTypeName}}{}).CheckRelationNames(params.Related...)
+    if err != nil {
+        return err
+    }
+
+	ret := make(map[string]interface{}, 3)
+
+	if params.ReturnCount {
+		count, err := h.Store.Search{{.ModelName}}Count(queryCtx,
+			params.Criteria, params.OrderBy,
+			maxLimit)
+		if err != nil {
+			return err
+		}
+		ret["count"] = count
+	}
+
+	resultList, err := h.Store.Search{{.ModelName}}(queryCtx,
+		params.Criteria, params.OrderBy,
+		params.Limit, params.Offset,
+		params.Related...)
 	if err != nil {
 		return err
 	}
+	ret["result_list"] = resultList
+	ret["result_length"] = len(resultList)
+
+	{{/*
+	// TODO: It would be nice to sanely implement paging.  I think using
+	// headers to convey paging is a crappy way to go - harder for clients
+	// expecting JSON to handle.  The idea of "caller needs 10 on a page
+	// so ask for 11 and if you get it you know there's another page" should
+	// work fine but should be internalized here so that complexity isn't 
+	// pushed back to the caller.  So maybe it's just limit, offset that gets
+	// passed in and the result {result_list:...:has_more:true} or something. 
+	// Do more looking at other APIs and find someone doing it well.
+	// https://www.moesif.com/blog/technical/api-design/REST-API-Design-Filtering-Sorting-and-Pagination/
+
+	// We also should support pagination based on keys (i.e. "10 next records after X")
+	// so it doesn't choke on large datasets - I can see use cases for both approaches
+	*/}}
 
 	{{/* FIXME: so do we return this error or not? if we return it
 		then the caller will double-output the error, if not we just
 		hid the error - maybe we need a log statement specifically
 		for this case, think it through and drop it in */}}
-	ar.WriteResult(w, 200, {{.ModelNameL}}List)
+
+	ar.WriteResult(w, 200, ret)
 
 	return nil
 }
 
-func (h *{{.ModelName}}APIController) GetByID(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest, {{.ModelNameL}}ID string) error {
+func (h *{{.ModelName}}APIController) Fetch(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest, {{.ModelNameL}}ID string, related ...string) error {
 
-	if !userctrl.ReqUserHasPerm(r, {{.ModelName}}GetByIDPerm) {
+	if !userctrl.ReqUserHasPerm(r, {{.ModelName}}FetchPerm) {
 		return &httpapi.ErrorDetail{Code: 403, Message: "access denied"}
 	}
 
-	{{.ModelNameL}}, err := h.Store.Find{{.ModelName}}ByID({{.ModelNameL}}ID)
-	{{/* FIXME: need better handling of not found case */}}
+	var {{.ModelNameL}} {{.ModelTypeName}}
+	err := h.Store.Fetch{{.ModelName}}(r.Context(), &{{.ModelNameL}}, {{.ModelNameL}}ID, related...)
+	if webutil.IsNotFound(err) {
+		return &httpapi.ErrorDetail{Code: 404, Message: "not found"}
+	}
 	if err != nil {
 		return err
 	}
+
+	// TODO: sometimes return values need to be vetted/scrubbed, both
+	// here and in Search, before being returned, where should this
+	// call go?  Might be better actually to ensure at the store
+	// layer we can just avoid loading the fields we don't need...
+	// Although that might be a specific case for certain data types that we
+	// don't want to have in everything by default.
 
 	ar.WriteResult(w, 200, {{.ModelNameL}})
 
 	return nil
 }
 
-func (h *{{.ModelName}}APIController) Update(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest, {{.ModelNameL}} *{{.ModelTypeName}}) error {
+func (h *{{.ModelName}}APIController) Update(w http.ResponseWriter, r *http.Request, ar *httpapi.APIRequest, {{.ModelNameL}}ID string, mapData map[string]interface{}) error {
 
 	if !userctrl.ReqUserHasPerm(r, {{.ModelName}}UpdatePerm) {
 		return &httpapi.ErrorDetail{Code: 403, Message: "access denied"}
 	}
 
-	err = h.Store.Update{{.ModelName}}({{.ModelNameL}})
+	{{/*
+	// FIXME: THIS IS STILL NEEDED - ESPECIALLY THE ERRORS THAT ROLL UP TO THE UI
+	// TODO: Validation!
+	// Tags in model
+	// Check in store calls
+	// Additional validation in controller
+	// Errors that roll all the way up to the UI - look at responses codes, how to indicate what validation went wrong etc
+	// Translatable
+	*/}}
+
+	// TODO: add version number check, so we can do optimistic locking all the
+	// way up to the form/UI
+	var {{.ModelNameL}} {{.ModelTypeName}}
+	err := h.Store.Fetch{{.ModelName}}(r.Context(), &{{.ModelNameL}}, {{.ModelNameL}}ID)
+	if err != nil {
+		return err
+	}
+
+	// patch the fillable fields
+	err = httpapi.Fill(&{{.ModelNameL}}, mapData)
+	if err != nil {
+		return err
+	}
+
+	err = h.Store.Update{{.ModelName}}(r.Context(), &{{.ModelNameL}})
+	if webutil.IsNotFound(err) {
+		return &httpapi.ErrorDetail{Code: 404, Message: "not found"}
+	}
 	if err != nil {
 		return err
 	}
@@ -314,7 +462,10 @@ func (h *{{.ModelName}}APIController) Delete(w http.ResponseWriter, r *http.Requ
 		return &httpapi.ErrorDetail{Code: 403, Message: "access denied"}
 	}
 
-	err = h.OSGStore.Delete{{.ModelName}}({{.ModelNameL}}ID)
+	err := h.Store.Delete{{.ModelName}}(r.Context(), &{{.ModelTypeName}}{ {{.ModelName}}ID: {{.ModelNameL}}ID } )
+	if webutil.IsNotFound(err) {
+		return &httpapi.ErrorDetail{Code: 404, Message: "not found"}
+	}
 	if err != nil {
 		return err
 	}

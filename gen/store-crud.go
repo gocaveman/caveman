@@ -35,76 +35,236 @@ func init() {
 package {{.PackageName}}
 
 import (
+ 	"context"
+
  	"github.com/bradleypeabody/gouuidv6"
  	"github.com/gocaveman/caveman/valid"
+ 	"github.com/gocaveman/tmeta/tmetadbr"
+ 	"github.com/gocaveman/tmeta/tmetautil"
+ 	"github.com/gocraft/dbr"
 )
 
-// New{{.ModelName}} returns a new empty instance of the appropriate type.
-func (s *{{.StoreName}}) New{{.ModelName}}() {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}} {
-	{{if .GenericMode}} return reflect.New(s.NameTypes["{{.ModelName}}"]).Addr().Interface()
-	{{else}} return &{{.ModelName}}{}
-	{{end}} }
+// Create{{.ModelName}} inserts the record into the database.
+func (s *{{.StoreName}}) Create{{.ModelName}}(ctx context.Context, o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
 
-// FIXME: We need something that allows us to pass a logger into NewSession, so we can
-// enable detailed query logging when needed.  Should be autowire-able and easy to just
-// drop in to start logging everything.
-
-// Insert{{.ModelName}} inserts the record into the database.
-func (s *{{.StoreName}}) Insert{{.ModelName}}(o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
-
-	// FIXME: just change everything to use transactions, so we're in the habit of doing this
-	// and we set a good example for other more crazy methods that get added.
-
-	// FIXME: Also contexts! Think this through, but it might be smart to just pass
-	// a context to each call as an initial param and just be in that habit.
-	// The primary reason is to support cancellation.
-
- 	// FIXME: need UUID only for non-auto-inc case, should we move gouuidv6 into caveman?  maybe gocaveman/gouuidv6
- 	if o.{{.ModelName}}ID == "" {
- 		o.{{.ModelName}}ID = gouuidv6.NewB64().String()
- 	}
- 	err := valid.Obj(o, nil)
- 	if err != nil {
- 		return err
- 	}
- 	sess := s.NewSession(nil)
- 	return sess.ObjInsert(o)
-}
-
-// Update{{.ModelName}} updates this record in the database.
-func (s *{{.StoreName}}) Update{{.ModelName}}(o *{{.ModelName}}) error {
-	// TODO: version field code for when we have that working...
-	err := valid.Obj(o, nil)
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	sess := s.NewSession(nil)
-	return sess.ObjUpdate(o)
+	defer tx.RollbackUnlessCommitted()
+
+	err = valid.Obj(o, nil)
+	if err != nil {
+		return err
+	}
+
+	b := tmetadbr.New(tx, s.Meta)
+	_, err = b.MustInsert(o).Exec()
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-// TODO: update diff? (probably not a bad idea, see if it makes sense with how the controller is done)
+// Update{{.ModelName}} updates this record in the database.
+func (s *{{.StoreName}}) Update{{.ModelName}}(ctx context.Context, o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
 
-// Delete{{.ModelName}} deletes this record from the database.  The key can
-// either be in the instance provided, or specified separately.
-func (s *{{.StoreName}}) Delete{{.ModelName}}(o *{{.ModelName}}, pk ...interface{}) error {
-	sess := s.NewSession(nil)
-	return sess.ObjDelete(o, pk...)
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.RollbackUnlessCommitted()
+
+	err = valid.Obj(o, nil)
+	if err != nil {
+		return err
+	}
+
+	b := tmetadbr.New(tx, s.Meta)
+	err = b.ResultWithOneUpdate(b.MustUpdateByID(o).Exec())
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-// Get{{.ModelName}} fetches a record from the database.  The key can
-// either be in the instance provided, or specified separately.
-// If the record cannot be found, dbr.ErrNotFound will be returned.
-func (s *{{.StoreName}}) Get{{.ModelName}}(o *{{.ModelName}}, pk ...interface{}) error {
-	sess := s.NewSession(nil)
-	return sess.ObjGet(o, pk...)
+// Delete{{.ModelName}} deletes this record in the database.
+func (s *{{.StoreName}}) Delete{{.ModelName}}(ctx context.Context, o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}) error {
+
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.RollbackUnlessCommitted()
+
+	b := tmetadbr.New(tx, s.Meta)
+	err = b.ResultWithOneUpdate(b.MustDeleteByID(o).Exec())
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-// TODO: figure out Find... methods... (think about listing page)
+// Fetch{{.ModelName}} get a record in the database by ID.
+func (s *{{.StoreName}}) Fetch{{.ModelName}}(ctx context.Context, o {{if .GenericMode}}interface{}{{else}}*{{.ModelName}}{{end}}, id string, related ...string) error {
+
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.RollbackUnlessCommitted()
+
+	b := tmetadbr.New(tx, s.Meta)
+	err = b.MustSelectByID(o, id).LoadOne(o)
+	if err != nil {
+		return err
+	}
+
+	ti := s.Meta.For(o)
+	for _, r := range related {
+		rstmt, err := b.SelectRelation(o, r)
+		if err != nil {
+			return err
+		}
+		_, err = rstmt.Load(
+			ti.RelationTargetPtr(o, r))
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+{{/* FIXME: security goes in controller - so move the strict check of the
+fields on criteria and orderby and related etc up up there
+*/}}
+
+func (s *{{.StoreName}}) Search{{.ModelName}}Count(ctx context.Context, criteria tmetautil.Criteria, orderBy tmetautil.OrderByList, maxRows int64) (int64, error) {
+
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.RollbackUnlessCommitted()
+
+	ti := s.Meta.For({{.ModelName}}{})
+
+	stmt := tx.Select(ti.SQLPKFields()...).From(ti.SQLName())
+
+	whereSql, args, err := criteria.SQL()
+	if err != nil {
+		return 0, err
+	}
+	if len(whereSql) > 0 {
+		stmt = stmt.Where(whereSql, args...)
+	}
+
+	for _, o := range orderBy {
+		stmt = stmt.OrderDir(o.Field, !o.Desc)
+	}
+
+	if maxRows >= 0 {
+		stmt = stmt.Limit(uint64(maxRows))
+	}
+
+	buf := dbr.NewBuffer()
+	err = stmt.Build(s.dbrc.Dialect, buf)
+	if err != nil {
+		return 0, err
+	}
+	innerSQL := buf.String()
+	args = buf.Value()
+
+	var c int64
+	err = tx.SelectBySql("SELECT count(1) c FROM ("+innerSQL+") t", args...).LoadOne(&c)
+	if err != nil {
+		return 0, err
+	}
+
+	return c, tx.Commit()
+}
+
+// Search{{.ModelName}} builds and runs a select statement from the input you provide.
+func (s *{{.StoreName}}) Search{{.ModelName}}(ctx context.Context, criteria tmetautil.Criteria, orderBy tmetautil.OrderByList, limit, offset int64, related ...string) ([]{{.ModelName}}, error) {
+
+	tx, err := s.dbrc.NewSession(s.EventReceiver).BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.RollbackUnlessCommitted()
+
+	b := tmetadbr.New(tx, s.Meta)
+
+	ti := s.Meta.For({{.ModelName}}{})
+
+	stmt := tx.Select(ti.SQLFields(true)...).From(ti.SQLName())
+
+	whereSql, args, err := criteria.SQL()
+	if err != nil {
+		return nil, err
+	}
+	if len(whereSql) > 0 {
+		stmt = stmt.Where(whereSql, args...)
+	}
+
+	for _, o := range orderBy {
+		stmt = stmt.OrderDir(o.Field, !o.Desc)
+	}
+
+	if offset > 0 {
+		stmt = stmt.Offset(uint64(offset))
+	}
+	if limit >= 0 {
+		stmt = stmt.Limit(uint64(limit))
+	}
+
+	// empty set should return zero length slice instead of nil for proper JSON output and semantic correctness
+	ret := make([]{{.ModelName}}, 0)
+	_, err = stmt.Load(&ret)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(related) > 0 {
+		for i := range ret {
+			for _, r := range related {
+				rstmt, err := b.SelectRelation(&ret[i], r)
+				if err != nil {
+					return nil, err
+				}
+				_, err = rstmt.Load(
+					ti.RelationTargetPtr(&ret[i], r))
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	return ret, tx.Commit()
+}
+
+
+{{/* NOTE: the paging/limits here are all based on the idea of not overloading the database server and putting sensible limits on how
+	much data a client can ask for. However it is completely feasible for clients to page through an arbitrarily large data set
+	by asking for the next N records where KEY > LAST_KEY, and clients don't need any special tools for that particularly
+	- this should definitely be documented somewhere */}}
+
+
+// TODO: figure out Find... methods... (think about listing page); also make sure empty
+// list returns zero length slice and not nil, so JSON marshaling etc work as expected
+// (it's also, while less efficient, semantically correct - the search didn't return "nothing"
+// it returned zero of the specified element - and this difference also shows up in
+// the resulting JSON)
 
 // TODO: upsert? - maybe it's an option to add an example if desired.
 
-// TODO: relations/joins; also specifically look at having methods that say "set the
-// list of this type of joint to exactly X set as one call in one transaction", rather
+// TODO: related/joins; also specifically look at having methods that say "set the
+// list of this type of join to exactly X set as one call in one transaction", rather
 // than having to delete and re-write.
 
 `, false)
@@ -112,7 +272,8 @@ func (s *{{.StoreName}}) Get{{.ModelName}}(o *{{.ModelName}}, pk ...interface{})
 			return err
 		}
 
-		if *tests {
+		// TODO: disable tests for now until we fill this in
+		if false && *tests {
 
 			testsTargetFile := strings.Replace(targetFile, ".go", "_test.go", 1)
 			if testsTargetFile == targetFile {
@@ -149,18 +310,18 @@ func Test{{.ModelName}}CRUD(t *testing.T) {
 		// Title:       "Clean the Kitchen",
 		// Description: "It's gross",
 	}
-	err = store.Insert{{.ModelName}}(o)
+	err = store.Create{{.ModelName}}(o)
 	assert.NoError(err)
 	// TODO: o.Title = "Deep Clean the Kitchen"
 	err = store.Update{{.ModelName}}(o)
 	assert.NoError(err)
 	o2 := &{{.ModelName}}{}
-	err = store.Get{{.ModelName}}(o2, o.{{.ModelName}}ID)
+	err = store.Fetch{{.ModelName}}(o2, o.{{.ModelName}}ID)
 	assert.NoError(err)
 	// TODO: assert.Equal("Deep Clean the Kitchen", o2.Title)
 	err = store.Delete{{.ModelName}}(o2)
 	assert.NoError(err)
-	err = store.Get{{.ModelName}}(o2)
+	err = store.Fetch{{.ModelName}}(o2)
 	assert.Error(err)
 
 }
