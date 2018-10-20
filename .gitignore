@@ -21,4 +21,7 @@ embed-data-dev.go
 
 *-dev.go
 
+# vscode stuff
+.vscode
+*.code-*
 
