@@ -32,7 +32,13 @@ func TestWeberrors(t *testing.T) {
 	assert.Equal("some error", ErrorMessage(errLoc))
 	assert.Equal("some data", ErrorData(errLoc))
 
+	errPrefix := ErrPrefix("test error: ", errLoc)
+	assert.Error(errPrefix)
+	assert.Equal(501, ErrorCode(errLoc))
+	assert.Contains(errPrefix.Error(), "test error: ")
+
 	// check RootCause
+	assert.Equal(baseErr, RootCause(errPrefix))
 	assert.Equal(baseErr, RootCause(errLoc))
 	assert.Equal(baseErr, RootCause(err))
 	assert.Equal(baseErr, RootCause(baseErr))

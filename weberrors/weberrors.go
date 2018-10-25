@@ -1,4 +1,43 @@
-// Package weberrors augments errors with an additional code, data and message for convenience while writing web applications.
+/*
+Package weberrors augments errors with an additional code, data and message for convenience while writing web applications.
+It also provides wrapping and unwrapping where a Cause() method undicates an underlying error.
+
+The New() method will wrap the error your provide and return a new one with the provided code, message and data.
+These fields correspond to the <a href="https://www.jsonrpc.org/specification#error_object" target="_blank">JSON RPC 2.0 error</a> code, message and data fields.
+They are also very useful when returning errors from REST calls.
+
+The Causer interface specifies the method Cause() error which can be used to
+retrieve an underlying error - it's cause.  Any time an error is wrapped by a method in this package
+the returned error will implement Causer.
+
+The methods ErrorCode(error) int, ErrorMessage(error) string and ErrorData(error) interface{}
+provide access to each of the fields wrapped with a New() call, and will "unwrap" the error by calling Cause() as necessary
+to extract the needed value.  The httpapi uses these methods to extract information when
+
+Note that weberrors.ErrorMessage(err) and err.Error() will generally return two completely different things - the former
+being the <strong>public-facing error message</strong> returned to the caller and the latter being the <strong>internal error message</strong> which is usually
+either checked for and handled or logged.
+
+	// start with this error
+	var baseErr = fmt.Errorf("base error")
+
+	// wrap it with web info
+	var webErr = weberrors.New(baseErr,
+		501,
+		"Something went wrong",
+		"additional data")
+
+	// also specify the location
+	var finalErr = weberrors.ErrLoc(webErr)
+
+	// let's see what info we can extract from it
+	fmt.Printf("Error: %v\n", finalErr)
+	fmt.Printf("Error Cause: %v\n", weberrors.RootCause(finalErr))
+	fmt.Printf("Error Code: %v\n", weberrors.ErrorCode(finalErr))
+	fmt.Printf("Error Message: %v\n", weberrors.ErrorMessage(finalErr))
+	fmt.Printf("Error Data: %v\n", weberrors.ErrorData(finalErr))
+
+*/
 package weberrors
 
 import (
@@ -151,6 +190,30 @@ type Causer interface {
 	Cause() error
 }
 
+type errPrefix struct {
+	cause  error
+	prefix string
+}
+
+// Cause returns the underlying error.
+func (ep *errPrefix) Cause() error {
+	return ep.cause
+}
+
+// Error returns the cause error prefixed by the strinct provided
+func (ep *errPrefix) Error() string {
+	return ep.prefix + ep.cause.Error()
+}
+
+// ErrPrefix returns an error whose Error() method return will have the specified prefix.
+// The error provided must not be nil and is set as the cause for the error returned.
+func ErrPrefix(prefix string, err error) error {
+	return &errPrefix{
+		prefix: prefix,
+		cause:  err,
+	}
+}
+
 type errLoc struct {
 	cause    error
 	location string
@@ -161,7 +224,7 @@ func (el *errLoc) Cause() error {
 	return el.cause
 }
 
-// Error returns the causes error prefixed by location information (file and line number).
+// Error returns the cause error prefixed by location information (file and line number).
 func (el *errLoc) Error() string {
 	return el.location + ": " + el.cause.Error()
 }
