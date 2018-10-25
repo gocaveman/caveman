@@ -3,7 +3,7 @@ Package weberrors augments errors with an additional code, data and message for 
 It also provides wrapping and unwrapping where a Cause() method undicates an underlying error.
 
 The New() method will wrap the error your provide and return a new one with the provided code, message and data.
-These fields correspond to the <a href="https://www.jsonrpc.org/specification#error_object" target="_blank">JSON RPC 2.0 error</a> code, message and data fields.
+These fields correspond to the JSON RPC 2.0 error code, message and data fields.
 They are also very useful when returning errors from REST calls.
 
 The Causer interface specifies the method Cause() error which can be used to
@@ -15,7 +15,7 @@ provide access to each of the fields wrapped with a New() call, and will "unwrap
 to extract the needed value.  The httpapi uses these methods to extract information when
 
 Note that weberrors.ErrorMessage(err) and err.Error() will generally return two completely different things - the former
-being the <strong>public-facing error message</strong> returned to the caller and the latter being the <strong>internal error message</strong> which is usually
+being the public-facing error message returned to the caller and the latter being the internal error message which is usually
 either checked for and handled or logged.
 
 	// start with this error
@@ -65,8 +65,8 @@ type Detail struct {
 
 // Cause returns the underlying error (field Err).
 // We use the name Cause from github.com/pkg/errors, since
-// the <a href="https://go.googlesource.com/proposal/+/master/design/go2draft-error-values-overview.md">Go2 Error Value Draft Proposal</a>
-// (which suggests the name Unwrap) is not standardized yet.
+// the Go2 Error Value Draft Proposal, which suggests the name Unwrap, is not standardized yet
+// (see https://go.googlesource.com/proposal/+/master/design/go2draft-error-values-overview.md).
 func (d *Detail) Cause() error {
 	return d.Err
 }
