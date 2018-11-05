@@ -10,9 +10,10 @@
 //         }
 //
 //         type ExampleHandler struct {
-//             Config *Config `autowire:""`              // no name indicates "default"
-//             Prefix string  `autowire:"api_prefix"`    // TODO: format for names?
-//             Debug  bool    `autowire:"debug,optional" // the optional flag means wiring won't fail if not populated
+//             Config  *Config  `autowire:""`              // no name indicates "default"
+//             Prefix  string   `autowire:"api_prefix"`    // TODO: format for names?
+//             Debug   bool     `autowire:"debug,optional" // the optional flag means wiring won't fail if not populated
+//             Options []string `autowire:"options,slice"  // the slice flag means mulitple values can be assigned and collected here
 //         }
 //
 //         func (h *ExampleHandler)ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -83,10 +84,10 @@ func ProvideAndPopulate(name string, i interface{}) {
 func Contents() *Wirer {
 	var w Wirer
 	// deep copy the slices
-	w.Providers = make([]Provider, len(global.Providers))
-	copy(w.Providers, global.Providers)
-	w.Populators = make([]interface{}, len(global.Populators))
-	copy(w.Populators, global.Populators)
+	w.providers = make([]provider, len(global.providers))
+	copy(w.providers, global.providers)
+	w.populators = make([]interface{}, len(global.populators))
+	copy(w.populators, global.populators)
 	return &w
 }
 
@@ -100,17 +101,53 @@ func Contents() *Wirer {
 // and make it modifiable but probably should not expose how it stores
 // this info.
 
+// New returns a new empty Wirer instance ready for use.
+func New() *Wirer {
+	return &Wirer{}
+}
+
 // Wirer contains the Providers and Populators, usually there is one for
 // the entire application.
 type Wirer struct {
-	Providers  []Provider
-	Populators []interface{}
+	providers  []provider
+	populators []interface{}
+}
+
+type provider struct {
+	name  string
+	value interface{}
+}
+
+// Name returns the name, implementing Provider interface.
+func (p provider) Name() string {
+	return p.name
+}
+
+// Value returns the value, implementing Provider interface.
+func (p provider) Value() interface{} {
+	return p.value
 }
 
 // Provider represents an instance with a specific name that is provided.
-type Provider struct {
-	Name  string
-	Value interface{}
+type Provider interface {
+	Name() string
+	Value() interface{}
+}
+
+// Providers returns the list of providers.
+func (w *Wirer) Providers() []Provider {
+	ret := make([]Provider, 0, len(w.providers))
+	for _, p := range w.providers {
+		ret = append(ret, p)
+	}
+	return ret
+}
+
+// Populators returns the list of populators.
+func (w *Wirer) Populators() []interface{} {
+	ret := make([]interface{}, len(w.populators))
+	copy(ret, w.populators)
+	return ret
 }
 
 // Provide add an instance to the list of providers with the specified name.
@@ -119,13 +156,13 @@ type Provider struct {
 // instance, specify a meaningful name TODO(bgp): describe format, otherwise
 // it's going to get really random without any guidelines.
 func (w *Wirer) Provide(name string, i interface{}) {
-	w.Providers = append(w.Providers, Provider{Name: name, Value: i})
+	w.providers = append(w.providers, provider{name: name, value: i})
 }
 
 // Populate specifies a struct with fields to be populated.  Only fields
 // with an 'autowire' struct tag are populated.
 func (w *Wirer) Populate(i interface{}) {
-	w.Populators = append(w.Populators, i)
+	w.populators = append(w.populators, i)
 }
 
 // ProvideAndPopulate is the same as calling Provide(name, i); Populate(i);
@@ -144,7 +181,7 @@ func (w *Wirer) ProvideAndPopulate(name string, i interface{}) {
 func (w *Wirer) Run() error {
 
 	// loop over each populator
-	for _, pop := range w.Populators {
+	for _, pop := range w.populators {
 		vpop := reflect.ValueOf(pop)
 
 		tpop := reflect.TypeOf(pop)
@@ -182,25 +219,37 @@ func (w *Wirer) Run() error {
 			tagParts := strings.Split(fieldt.Tag.Get("autowire"), ",")
 
 			name := tagParts[0]
-			optional := false
-			if len(tagParts) > 1 {
-				if tagParts[1] == "optional" {
-					optional = true
-				}
-			}
+			tagO := newTagOpts(tagParts[1:])
+			// optional := false
+			// if len(tagParts) > 1 {
+			// 	if tagParts[1] == "optional" {
+			// 		optional = true
+			// 	}
+			// }
 
 			// loop through each provider
-			for _, vprov := range w.Providers {
-				if vprov.Name == name {
-					if reflect.TypeOf(vprov.Value).ConvertibleTo(fieldt.Type) {
-						fieldv.Set(reflect.ValueOf(vprov.Value))
+			for _, vprov := range w.providers {
+				if vprov.name == name {
+
+					// case where types match
+					if reflect.TypeOf(vprov.value).AssignableTo(fieldt.Type) {
+						fieldv.Set(reflect.ValueOf(vprov.value))
 						break
+					}
+
+					// case where it's tagged as a slice and the slice element value matches
+					if tagO.HasOpt("slice") && fieldt.Type.Kind() == reflect.Slice {
+						if reflect.TypeOf(vprov.value).AssignableTo(fieldt.Type.Elem()) {
+							newSlice := reflect.Append(fieldv, reflect.ValueOf(vprov.value))
+							fieldv.Set(newSlice)
+							continue // for a slice there can be mulitple, keep checking
+						}
 					}
 				}
 			}
 
 			if isZeroOfUnderlyingType(fieldv.Interface()) {
-				if !optional {
+				if !tagO.HasOpt("optional") {
 					return fmt.Errorf("object %#v field %q is empty and not marked optional (value=%#v)", pop, fieldt.Name, fieldv.Interface())
 				}
 			}
@@ -210,7 +259,7 @@ func (w *Wirer) Run() error {
 	}
 
 	// for anything that implements AfterWire() call it now
-	for _, pop := range w.Populators {
+	for _, pop := range w.populators {
 		if aw, ok := pop.(AfterWirer); ok {
 			err := aw.AfterWire()
 			if err != nil {
@@ -229,3 +278,28 @@ func isZeroOfUnderlyingType(x interface{}) bool {
 	}
 	return reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface())
 }
+
+type tagOpts map[string]bool
+
+func (t tagOpts) HasOpt(n string) bool {
+	return t[n]
+}
+
+func newTagOpts(sslice []string) tagOpts {
+	if len(sslice) == 0 {
+		return nil
+	}
+	ret := make(tagOpts, len(sslice))
+	for _, s := range sslice {
+		ret[s] = true
+	}
+	return ret
+}
+
+// FIXME: switch to using hidden member vars but provide public accessor methods DONE
+// TODO: add "slice" as an option, allowing adding a matching one to a slice
+// (we're going to use this instead of registries) - what about the idea of
+// just adding a slice itself - so you Populate(&hl) - see if that's viable
+// TODO: review if we can do something with the code generator snippets - so
+// we can say "insert this snippet in the main wiring section" or maybe it's
+// just "add one of these types as provider+populator"

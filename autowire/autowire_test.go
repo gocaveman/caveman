@@ -9,11 +9,12 @@ import (
 )
 
 type T1 struct {
-	NoTag string // no tag
-	T2V   *T2    `autowire:""`                     // empty tag
-	T3V   *T3    `autowire:"t3"`                   // named tag
-	T4V   T4     `autowire:"t4"`                   // interface
-	Opt   string `autowire:"nothinghere,optional"` // optional
+	NoTag   string   // no tag
+	T2V     *T2      `autowire:""`                     // empty tag
+	T3V     *T3      `autowire:"t3"`                   // named tag
+	T4V     T4       `autowire:"t4"`                   // interface
+	Opt     string   `autowire:"nothinghere,optional"` // optional
+	Strings []string `autowire:"things,slice"`         // a slice of string things
 }
 
 var afterWireCalled bool = false
@@ -41,11 +42,15 @@ func TestAutoWire(t *testing.T) {
 	t3 := &T3{}
 	t4 := fmt.Errorf("test")
 
-	w := &Wirer{}
+	w := New()
 	w.Populate(t1)
 	w.Provide("", t2)
 	w.Provide("t3", t3)
 	w.Provide("t4", t4)
+	w.Provide("things", "a string")
+	w.Provide("things", "b string")
+
+	// log.Printf("w: %#v", w)
 
 	err := w.Run()
 	if err != nil {
@@ -59,6 +64,7 @@ func TestAutoWire(t *testing.T) {
 	assert.Equal(t3, t1.T3V)
 	assert.Equal(t4, t1.T4V)
 	assert.Equal("", t1.Opt)
+	assert.Len(t1.Strings, 2)
 
 	assert.True(afterWireCalled)
 
