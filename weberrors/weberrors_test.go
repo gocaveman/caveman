@@ -19,11 +19,12 @@ func TestWeberrors(t *testing.T) {
 	assert.Nil(ErrorData(baseErr))
 
 	// now one with weberrors.Detail
-	err := New(baseErr, 501, "some error", "some data")
+	err := New(baseErr, 501, "some error", "some data", nil)
 	assert.Error(err)
 	assert.Equal(501, ErrorCode(err))
 	assert.Equal("some error", ErrorMessage(err))
 	assert.Equal("some data", ErrorData(err))
+	assert.NotEmpty(ErrorHeaders(err).Get("X-Id"))
 
 	// now wrap that with ErrLoc and make sure it still works
 	errLoc := ErrLoc(err)

@@ -42,38 +42,78 @@ package weberrors
 
 import (
 	"fmt"
+	"math/rand"
+	"net/http"
 	"runtime"
+	"time"
 )
 
-// New returns a Detail instance with the fields you provide.
-func New(err error, code int, message string, data interface{}) *Detail {
-	return &Detail{
+// NewCode returns an error with the cause and code you provide.
+func NewCode(err error, code int) error {
+	if err == nil {
+		panic("nil cause error passed to weberrors.NewCode")
+	}
+	return &errCode{
+		Err:     err,
+		Code:    code,
+		Headers: setErrID(nil),
+	}
+}
+
+type errCode struct {
+	Err     error       `json:"-"`
+	Code    int         `json:"code,omitempty"`
+	Headers http.Header `json:"-"`
+}
+
+func (c *errCode) Cause() error {
+	return c.Err
+}
+
+func (c *errCode) Error() string {
+	if c.Err != nil {
+		return c.Err.Error()
+	}
+	return ""
+}
+
+func (c *errCode) ErrorHeaders() http.Header {
+	return c.Headers
+}
+
+// New returns a error instance with the cause error, code, message, data and headers you provide.
+func New(err error, code int, message string, data interface{}, headers http.Header) error {
+	if err == nil {
+		panic("nil cause error passed to weberrors.New")
+	}
+	return &detail{
 		Err:     err,
 		Code:    code,
 		Message: message,
 		Data:    data,
+		Headers: setErrID(headers),
 	}
 }
 
-// Detail provides an implementation of ErrorCoder, ErrorMessager and ErrorDataer.
-type Detail struct {
+type detail struct {
 	Err     error       `json:"-"`
 	Code    int         `json:"code,omitempty"`
 	Message string      `json:"message,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
+	Headers http.Header `json:"-"`
 }
 
 // Cause returns the underlying error (field Err).
 // We use the name Cause from github.com/pkg/errors, since
 // the Go2 Error Value Draft Proposal, which suggests the name Unwrap, is not standardized yet
 // (see https://go.googlesource.com/proposal/+/master/design/go2draft-error-values-overview.md).
-func (d *Detail) Cause() error {
+func (d *detail) Cause() error {
 	return d.Err
 }
 
 // Error implements the error interface by returning the Err.Error().
 // This corresponds to the internal message.
-func (d *Detail) Error() string {
+func (d *detail) Error() string {
 	if d.Err != nil {
 		return d.Err.Error()
 	}
@@ -81,18 +121,23 @@ func (d *Detail) Error() string {
 }
 
 // ErrorCode returns the error code.
-func (d *Detail) ErrorCode() int {
+func (d *detail) ErrorCode() int {
 	return d.Code
 }
 
 // ErrorMessage returns the public error message.
-func (d *Detail) ErrorMessage() string {
+func (d *detail) ErrorMessage() string {
 	return d.Message
 }
 
 // ErrorData returns the data.
-func (d *Detail) ErrorData() interface{} {
+func (d *detail) ErrorData() interface{} {
 	return d.Data
+}
+
+// ErrorHeaders returns additional headers to be set on an HTTP response
+func (d *detail) ErrorHeaders() http.Header {
+	return d.Headers
 }
 
 // ErrorCoder has an ErrorCode() method.
@@ -165,6 +210,47 @@ func ErrorData(err error) interface{} {
 	}
 
 	return nil
+}
+
+// ErrorHeaderser is the interface for ErrorHeaders.
+// The name is so bad it's good.  A bit like Plan 9 from Outer Space.
+type ErrorHeaderser interface {
+	ErrorHeaders() http.Header
+}
+
+// ErrorHeaders unwraps the error provided and returns a composite of all of the headers found during the
+// unwrapping, with higher level values overwritting lower level ones.
+func ErrorHeaders(err error) http.Header {
+
+	var ret http.Header
+	addRet := func(h http.Header) {
+		if len(h) == 0 {
+			return
+		}
+		if ret == nil {
+			ret = make(http.Header)
+		}
+		// write each key that doesn't exist in the return
+		for k, v := range h {
+			if _, ok := ret[k]; !ok {
+				ret[k] = v
+			}
+		}
+	}
+
+	for err != nil {
+		eh, ok := err.(ErrorHeaderser)
+		if ok {
+			addRet(eh.ErrorHeaders()) // use whatever headers are there
+		}
+		c, ok := err.(Causer)
+		if !ok {
+			break
+		}
+		err = c.Cause()
+	}
+
+	return ret
 }
 
 // RootCause calls Cause() recursively until it finds an error that doesn't implement it and returns that.
@@ -243,4 +329,20 @@ func ErrLoc(err error) error {
 		cause:    err,
 		location: fmt.Sprintf("%s:%v", file, line),
 	}
+}
+
+var rnd = rand.New(rand.NewSource(time.Now().Unix()))
+
+func errID() string {
+	return fmt.Sprintf("%020d", rnd.Uint64())
+}
+
+func setErrID(h http.Header) http.Header {
+	if h == nil {
+		h = make(http.Header)
+	}
+	if h.Get("X-Id") == "" {
+		h.Set("X-Id", errID())
+	}
+	return h
 }
