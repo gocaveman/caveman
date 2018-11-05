@@ -197,19 +197,17 @@ func (w *Wirer) Run() error {
 		// loop over each field of the populator
 		for i := 0; i < vpop.NumField(); i++ {
 
+			fieldt := tpop.Field(i)
+			if len(fieldt.PkgPath) != 0 {
+				continue // skip unexported fields
+			}
+
 			fieldv := vpop.Field(i)
 
 			// don't populate again if it's already there
 			if !isZeroOfUnderlyingType(fieldv.Interface()) {
 				continue
 			}
-			// if !fieldv.IsNil() {
-			// 	continue
-			// }
-
-			// log.Printf("tpop.Kind(): %v", tpop.Kind())
-
-			fieldt := tpop.Field(i)
 
 			_, tagOk := fieldt.Tag.Lookup("autowire")
 			if !tagOk {
