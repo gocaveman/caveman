@@ -18,6 +18,7 @@ import (
 	"mime"
 	"net/http"
 
+	"github.com/gocaveman/caveman/weberrors"
 	"github.com/gocaveman/caveman/webutil"
 )
 
@@ -308,46 +309,68 @@ func (apir *APIRequest) WriteResult(w http.ResponseWriter, code int, obj interfa
 
 }
 
-type ErrorDetail struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-}
+// type ErrorDetail struct {
+// 	Code    int         `json:"code"`
+// 	Message string      `json:"message"`
+// 	Data    interface{} `json:"data,omitempty"`
+// }
 
-func (e *ErrorDetail) Error() string {
-	return e.Message
-}
+// func (e *ErrorDetail) Error() string {
+// 	return e.Message
+// }
 
-func (e *ErrorDetail) ErrorCode() int {
-	return e.Code
-}
+// func (e *ErrorDetail) ErrorCode() int {
+// 	return e.Code
+// }
 
-type ErrorCoder interface {
-	ErrorCode() int
-}
+// type ErrorCoder interface {
+// 	ErrorCode() int
+// }
 
 // FIXME: what about adding a method that acts like HTTPError - think that through
 // I think what's needed here is that by default everything acts like HTTPError
 // but we have interface(s) that allow the public message and error code and detail
 // data to be provided.
 
-// hm, do we have code and message stuff here or....
-func (apir *APIRequest) WriteError(w http.ResponseWriter, code int, err error) error {
+func (apir *APIRequest) WriteCodeErr(w http.ResponseWriter, code int, err error) error {
+	return apir.writeErr(w, err, code,
+		weberrors.ErrorMessage(err),
+		weberrors.ErrorData(err),
+		weberrors.ErrorHeaders(err),
+	)
+}
 
-	errorDetail, ok := err.(*ErrorDetail)
-	if !ok {
-		errorDetail = &ErrorDetail{
-			Code:    code,
-			Message: err.Error(),
-			Data:    err,
-		}
-		if ec, ok := err.(ErrorCoder); ok {
-			errorDetail.Code = ec.ErrorCode()
-		}
-	}
+func (apir *APIRequest) WriteErr(w http.ResponseWriter, err error) error {
+	return apir.writeErr(w, err,
+		weberrors.ErrorCode(err),
+		weberrors.ErrorMessage(err),
+		weberrors.ErrorData(err),
+		weberrors.ErrorHeaders(err),
+	)
+}
+
+func (apir *APIRequest) writeErr(w http.ResponseWriter, err error, code int, message string, data interface{}, h http.Header) error {
+
+	detail := weberrors.New(err, code, message, data, h)
+	// detail := &weberrors.Detail{
+	// 	Err:     err,
+	// 	Code:    code,
+	// 	Message: message,
+	// 	Data:    data,
+	// }
 
 	w.Header().Set("content-type", "application/json")
-	w.WriteHeader(code)
+	httpCode := code
+	if httpCode < 100 || httpCode >= 600 {
+		httpCode = 500
+	}
+	// assign any headers from h not already set
+	for k, v := range h {
+		if _, ok := w.Header()[k]; !ok {
+			w.Header()[k] = v
+		}
+	}
+	w.WriteHeader(httpCode)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 
@@ -355,12 +378,17 @@ func (apir *APIRequest) WriteError(w http.ResponseWriter, code int, err error) e
 
 		// jsonrpc2 gets wrapped in another object with "error" property
 		err := enc.Encode(map[string]interface{}{
-			"error": errorDetail,
+			"error": detail,
 		})
 		return err
 
 	}
 
-	err = enc.Encode(errorDetail)
+	err = enc.Encode(detail)
 	return err
 }
+
+// FIXME: use weberrors instead of our own ErrorDetail DONE
+// FIXME: make WriteError have the correct behavior for code, message, data NEEDS TESTING
+// FIXME: add something to enable logging upon WriteError(); also be sure to log an ID and send
+// X-Id so everything can be matched up.
