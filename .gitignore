@@ -25,3 +25,4 @@ embed-data-dev.go
 .vscode
 *.code-*
 
+.idea
