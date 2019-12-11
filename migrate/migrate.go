@@ -15,6 +15,17 @@ import (
 	"text/template"
 )
 
+// OpenFunc is the function to use to "open" connections.  It defaults to
+// sql.Open but you can set it to something else to intercept the call.
+var OpenFunc func(driverName, dataSourceName string) (*sql.DB, error) = sql.Open
+
+// CloseFunc is used to close a database instead of directly calling sql.DB.Close().
+// It defaults to a func that just calls sql.DB.Close() but you can set it to
+// something else as needed to match your custom OpenFunc.
+var CloseFunc func(*sql.DB) error = func(db *sql.DB) error {
+	return db.Close()
+}
+
 // multiple named migrations
 // must be able to test migrations
 // in a cluster it must not explode when mulitiple servers try to migrate at the same time
@@ -608,11 +619,11 @@ func (m *SQLMigration) Version() string    { return m.VersionValue }
 
 func (m *SQLMigration) exec(dsn string, stmts []string) error {
 
-	db, err := sql.Open(m.DriverNameValue, dsn)
+	db, err := OpenFunc(m.DriverNameValue, dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer CloseFunc(db)
 
 	for n, s := range stmts {
 		_, err := db.Exec(s)
@@ -664,11 +675,11 @@ func (m *SQLTmplMigration) Version() string    { return m.VersionValue }
 
 func (m *SQLTmplMigration) tmplExec(dsn string, stmts []string) error {
 
-	db, err := sql.Open(m.DriverNameValue, dsn)
+	db, err := OpenFunc(m.DriverNameValue, dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer CloseFunc(db)
 
 	for n, s := range stmts {
 
